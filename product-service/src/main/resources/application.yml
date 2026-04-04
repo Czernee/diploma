@@ -1,6 +1,19 @@
 spring:
   application:
     name: product-service
+  datasource:
+    url: ${PRODUCT_DB_URL:jdbc:postgresql://localhost:5432/diploma}
+    username: ${PRODUCT_DB_USERNAME:diploma}
+    password: ${PRODUCT_DB_PASSWORD:diploma}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
 
 server:
   port: 8082

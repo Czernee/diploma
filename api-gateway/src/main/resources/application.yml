@@ -2,6 +2,13 @@ spring:
   application:
     name: api-gateway
 
+gateway:
+  services:
+    auth: ${AUTH_SERVICE_URL:http://localhost:8081}
+    product: ${PRODUCT_SERVICE_URL:http://localhost:8082}
+    order: ${ORDER_SERVICE_URL:http://localhost:8083}
+    ai: ${AI_SERVICE_URL:http://localhost:8000}
+
 server:
   port: 8080
 

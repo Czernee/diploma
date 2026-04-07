@@ -1,6 +1,24 @@
 spring:
   application:
     name: auth-service
+  datasource:
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/diploma}
+    username: ${AUTH_DB_USERNAME:diploma}
+    password: ${AUTH_DB_PASSWORD:diploma}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
+
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET:change-me-to-a-long-secret-key-for-hs256-1234567890}
+    expiration-minutes: ${AUTH_JWT_EXPIRATION_MINUTES:60}
 
 server:
   port: 8081

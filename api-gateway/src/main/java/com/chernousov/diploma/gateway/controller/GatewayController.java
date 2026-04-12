@@ -1,6 +1,8 @@
 package com.chernousov.diploma.gateway.controller;
 
 import com.chernousov.diploma.gateway.config.GatewayServicesProperties;
+import com.chernousov.diploma.gateway.service.AuthValidationService;
+import com.chernousov.diploma.gateway.service.AuthenticatedUser;
 import com.chernousov.diploma.gateway.service.GatewayProxyService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
@@ -14,13 +16,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class GatewayController {
 
     private final GatewayProxyService gatewayProxyService;
+    private final AuthValidationService authValidationService;
     private final GatewayServicesProperties services;
 
     public GatewayController(
             GatewayProxyService gatewayProxyService,
+            AuthValidationService authValidationService,
             GatewayServicesProperties services
     ) {
         this.gatewayProxyService = gatewayProxyService;
+        this.authValidationService = authValidationService;
         this.services = services;
     }
 
@@ -31,40 +36,50 @@ public class GatewayController {
 
     @RequestMapping({"/api/auth", "/api/auth/**"})
     public ResponseEntity<byte[]> auth(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
-        return proxy(request, body, "/api/auth", services.auth());
+        return proxy(request, body, services.auth(), false);
     }
 
     @RequestMapping({"/api/products", "/api/products/**"})
     public ResponseEntity<byte[]> products(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
-        return proxy(request, body, "/api/products", services.product());
+        return proxy(request, body, services.product(), false);
     }
 
     @RequestMapping({"/api/orders", "/api/orders/**"})
     public ResponseEntity<byte[]> orders(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
-        return proxy(request, body, "/api/orders", services.order());
+        return proxy(request, body, services.order(), true);
     }
 
     @RequestMapping({"/api/configurator", "/api/configurator/**"})
     public ResponseEntity<byte[]> configurator(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
-        return proxy(request, body, "/api/configurator", services.ai());
+        return proxy(request, body, services.ai(), true);
     }
 
     private ResponseEntity<byte[]> proxy(
             HttpServletRequest request,
             byte[] body,
-            String routePrefix,
-            String serviceBaseUrl
+            String serviceBaseUrl,
+            boolean authRequired
     ) {
-        String path = request.getRequestURI();
-        String forwardedPath = path.length() <= routePrefix.length()
-                ? routePrefix
-                : path.substring(routePrefix.length());
-
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
         HttpHeaders headers = extractHeaders(request);
+        if (authRequired) {
+            AuthenticatedUser user = authValidationService.requireUser(headers);
+            if (user.id() != null) {
+                headers.set("X-User-Id", String.valueOf(user.id()));
+            }
+            if (user.username() != null) {
+                headers.set("X-User-Name", user.username());
+            }
+            if (user.email() != null) {
+                headers.set("X-User-Email", user.email());
+            }
+            if (user.role() != null) {
+                headers.set("X-User-Role", user.role());
+            }
+        }
         return gatewayProxyService.forward(
                 serviceBaseUrl,
-                forwardedPath,
+                request.getRequestURI(),
                 request.getQueryString(),
                 method,
                 headers,

@@ -1,6 +1,19 @@
 spring:
   application:
     name: order-service
+  datasource:
+    url: ${ORDER_DB_URL:jdbc:postgresql://localhost:5432/diploma}
+    username: ${ORDER_DB_USERNAME:diploma}
+    password: ${ORDER_DB_PASSWORD:diploma}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
 
 server:
   port: 8083

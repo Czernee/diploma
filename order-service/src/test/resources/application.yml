@@ -9,3 +9,7 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+app:
+  kafka:
+    enabled: false

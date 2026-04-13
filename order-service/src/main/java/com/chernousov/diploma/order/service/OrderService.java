@@ -11,6 +11,7 @@ import com.chernousov.diploma.order.dto.OrderResponse;
 import com.chernousov.diploma.order.exception.InvalidOrderStatusTransitionException;
 import com.chernousov.diploma.order.exception.OrderNotFoundException;
 import com.chernousov.diploma.order.repository.CustomerOrderRepository;
+import com.chernousov.diploma.order.service.event.OrderEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import java.util.List;
 public class OrderService {
 
     private final CustomerOrderRepository orderRepository;
+    private final OrderEventPublisher orderEventPublisher;
 
     @Transactional
     public OrderResponse createOrder(AuthenticatedUserHeader user, CreateOrderRequest request) {
@@ -51,7 +53,9 @@ public class OrderService {
                     .build());
         }
 
-        return toResponse(orderRepository.save(order));
+        CustomerOrder savedOrder = orderRepository.save(order);
+        orderEventPublisher.publishOrderCreated(savedOrder);
+        return toResponse(savedOrder);
     }
 
     public List<OrderResponse> myOrders(AuthenticatedUserHeader user) {
@@ -80,7 +84,11 @@ public class OrderService {
             }
         }
 
-        order.setStatus(newStatus);
+        OrderStatus previousStatus = order.getStatus();
+        if (previousStatus != newStatus) {
+            order.setStatus(newStatus);
+            orderEventPublisher.publishOrderStatusChanged(order, previousStatus);
+        }
         return toResponse(order);
     }
 

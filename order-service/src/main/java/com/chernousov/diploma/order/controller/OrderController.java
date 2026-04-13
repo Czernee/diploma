@@ -49,7 +49,7 @@ public class OrderController {
     public OrderResponse getOrder(
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader("X-User-Name") String usernameHeader,
-            @PathVariable Long orderId
+            @PathVariable("orderId") Long orderId
     ) {
         return orderService.getOrder(parseUserHeader(userIdHeader, usernameHeader), orderId);
     }
@@ -58,7 +58,7 @@ public class OrderController {
     public OrderResponse updateStatus(
             @RequestHeader("X-User-Id") String userIdHeader,
             @RequestHeader("X-User-Name") String usernameHeader,
-            @PathVariable Long orderId,
+            @PathVariable("orderId") Long orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request
     ) {
         return orderService.updateStatus(parseUserHeader(userIdHeader, usernameHeader), orderId, request.status());

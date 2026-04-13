@@ -14,6 +14,20 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    table: flyway_schema_history_order
+    baseline-on-migrate: true
+    baseline-version: 0
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring:
+          json:
+            add:
+              type:
+                headers: false
 
 server:
   port: 8083
@@ -27,3 +41,10 @@ management:
     health:
       probes:
         enabled: true
+
+app:
+  kafka:
+    enabled: ${ORDER_KAFKA_ENABLED:true}
+    topics:
+      order-created: ${ORDER_CREATED_TOPIC:order.created.v1}
+      order-status-changed: ${ORDER_STATUS_CHANGED_TOPIC:order.status.changed.v1}

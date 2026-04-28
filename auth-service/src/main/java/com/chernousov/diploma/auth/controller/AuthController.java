@@ -35,7 +35,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public UserProfileResponse me(@RequestHeader("Authorization") String authorizationHeader) {
+    public UserProfileResponse me(@RequestHeader(name = "Authorization") String authorizationHeader) {
         return authService.me(authorizationHeader);
     }
 }

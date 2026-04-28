@@ -25,7 +25,7 @@ class OrderServiceIntegrationTests {
 
     @Test
     void createAndFetchOwnOrderWorks() {
-        AuthenticatedUserHeader user = new AuthenticatedUserHeader(101L, "alice");
+        AuthenticatedUserHeader user = new AuthenticatedUserHeader(101L, "alice", "USER");
 
         var created = orderService.createOrder(user, new CreateOrderRequest(
                 List.of(
@@ -48,8 +48,8 @@ class OrderServiceIntegrationTests {
 
     @Test
     void myOrdersReturnsOnlyCurrentUserOrders() {
-        AuthenticatedUserHeader alice = new AuthenticatedUserHeader(201L, "alice");
-        AuthenticatedUserHeader bob = new AuthenticatedUserHeader(202L, "bob");
+        AuthenticatedUserHeader alice = new AuthenticatedUserHeader(201L, "alice", "USER");
+        AuthenticatedUserHeader bob = new AuthenticatedUserHeader(202L, "bob", "USER");
 
         orderService.createOrder(alice, new CreateOrderRequest(
                 List.of(new CreateOrderItemRequest(1L, "CPU", 1, new BigDecimal("100.00"))),
@@ -69,8 +69,8 @@ class OrderServiceIntegrationTests {
 
     @Test
     void orderCannotBeAccessedByAnotherUser() {
-        AuthenticatedUserHeader owner = new AuthenticatedUserHeader(301L, "owner");
-        AuthenticatedUserHeader stranger = new AuthenticatedUserHeader(302L, "stranger");
+        AuthenticatedUserHeader owner = new AuthenticatedUserHeader(301L, "owner", "USER");
+        AuthenticatedUserHeader stranger = new AuthenticatedUserHeader(302L, "stranger", "USER");
 
         var created = orderService.createOrder(owner, new CreateOrderRequest(
                 List.of(new CreateOrderItemRequest(3L, "RAM", 2, new BigDecimal("50.00"))),
@@ -83,17 +83,80 @@ class OrderServiceIntegrationTests {
     }
 
     @Test
-    void terminalStatusCannotBeChanged() {
-        AuthenticatedUserHeader user = new AuthenticatedUserHeader(401L, "alice");
+    void userCannotSetOperationalStatus() {
+        AuthenticatedUserHeader user = new AuthenticatedUserHeader(401L, "alice", "USER");
         var created = orderService.createOrder(user, new CreateOrderRequest(
                 List.of(new CreateOrderItemRequest(4L, "SSD", 1, new BigDecimal("80.00"))),
                 null,
                 "RUB"
         ));
 
-        orderService.updateStatus(user, created.id(), OrderStatus.DELIVERED);
-
-        assertThatThrownBy(() -> orderService.updateStatus(user, created.id(), OrderStatus.CANCELLED))
+        assertThatThrownBy(() -> orderService.updateStatus(user, created.id(), OrderStatus.CONFIRMED))
                 .isInstanceOf(InvalidOrderStatusTransitionException.class);
+    }
+
+    @Test
+    void userCanCancelOwnOrderBeforeShipping() {
+        AuthenticatedUserHeader user = new AuthenticatedUserHeader(402L, "alice", "USER");
+        var created = orderService.createOrder(user, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(5L, "Case", 1, new BigDecimal("70.00"))),
+                null,
+                "RUB"
+        ));
+
+        var cancelled = orderService.updateStatus(user, created.id(), OrderStatus.CANCELLED);
+        assertThat(cancelled.status()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void adminCanUpdateStatusForAnotherUsersOrder() {
+        AuthenticatedUserHeader customer = new AuthenticatedUserHeader(501L, "customer", "USER");
+        AuthenticatedUserHeader admin = new AuthenticatedUserHeader(999L, "admin", "ADMIN");
+
+        var created = orderService.createOrder(customer, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(6L, "GPU", 1, new BigDecimal("100.00"))),
+                null,
+                "RUB"
+        ));
+
+        var confirmed = orderService.updateStatus(admin, created.id(), OrderStatus.CONFIRMED);
+        assertThat(confirmed.status()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void adminCanViewAllOrders() {
+        AuthenticatedUserHeader alice = new AuthenticatedUserHeader(601L, "alice", "USER");
+        AuthenticatedUserHeader bob = new AuthenticatedUserHeader(602L, "bob", "USER");
+        AuthenticatedUserHeader admin = new AuthenticatedUserHeader(999L, "admin", "ADMIN");
+
+        orderService.createOrder(alice, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(7L, "CPU", 1, new BigDecimal("100.00"))),
+                null,
+                "RUB"
+        ));
+        orderService.createOrder(bob, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(8L, "GPU", 1, new BigDecimal("200.00"))),
+                null,
+                "RUB"
+        ));
+
+        var adminOrders = orderService.myOrders(admin);
+        assertThat(adminOrders).extracting("userId").contains(601L, 602L);
+    }
+
+    @Test
+    void adminCanGetAnotherUsersOrder() {
+        AuthenticatedUserHeader owner = new AuthenticatedUserHeader(701L, "owner", "USER");
+        AuthenticatedUserHeader admin = new AuthenticatedUserHeader(999L, "admin", "ADMIN");
+
+        var created = orderService.createOrder(owner, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(9L, "RAM", 1, new BigDecimal("90.00"))),
+                null,
+                "RUB"
+        ));
+
+        var loaded = orderService.getOrder(admin, created.id());
+        assertThat(loaded.id()).isEqualTo(created.id());
+        assertThat(loaded.userId()).isEqualTo(701L);
     }
 }

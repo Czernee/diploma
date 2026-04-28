@@ -8,6 +8,7 @@ Initial scaffold for a diploma project: distributed hardware ordering platform w
 - `product-service` (Spring Boot)
 - `order-service` (Spring Boot)
 - `ai-service` (FastAPI)
+- `frontend` (React + Vite + TypeScript)
 - `docker-compose.yml` (PostgreSQL, Redis, Kafka)
 
 ## Prerequisites
@@ -15,6 +16,7 @@ Initial scaffold for a diploma project: distributed hardware ordering platform w
 - Maven wrapper (`./mvnw`)
 - Docker + Docker Compose
 - Python 3.13 (for local `ai-service` run)
+- Node.js 18+ (for local `frontend` run)
 
 ## Infrastructure Start
 ```powershell
@@ -40,6 +42,15 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
+
+Run frontend:
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend is available at `http://localhost:5173` and proxies `/api/*` requests to `http://localhost:8080`.
 
 ## Health Endpoints
 - API Gateway: `http://localhost:8080/actuator/health`

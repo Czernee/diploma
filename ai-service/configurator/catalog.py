@@ -1,6 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
+
+import httpx
 
 from .models import ComponentType, Purpose
 
@@ -16,12 +19,14 @@ class ComponentOption:
     score_study: float
     score_general: float
     socket: str | None = None
+    supported_sockets: tuple[str, ...] = field(default_factory=tuple)
     ram_type: str | None = None
     gpu_tdp: int = 0
     cpu_tdp: int = 0
     psu_watts: int = 0
     supports_wifi: bool = False
     notes: tuple[str, ...] = field(default_factory=tuple)
+    product_id: int | None = None
 
     def score_for(self, purpose: Purpose) -> float:
         if purpose == Purpose.GAMING:
@@ -32,44 +37,127 @@ class ComponentOption:
             return self.score_study
         return self.score_general
 
+    def socket_candidates(self) -> tuple[str, ...]:
+        candidates = []
+        if self.socket:
+            candidates.append(self.socket)
+        candidates.extend(self.supported_sockets)
+        return tuple(dict.fromkeys(candidates))
 
-CATALOG: dict[ComponentType, list[ComponentOption]] = {
-    ComponentType.CPU: [
-        ComponentOption(ComponentType.CPU, "AMD Ryzen 5 5600", "amd", 11000, 7.6, 7.2, 7.0, 7.2, socket="AM4", cpu_tdp=65),
-        ComponentOption(ComponentType.CPU, "AMD Ryzen 5 7600", "amd", 19000, 8.5, 8.3, 8.0, 8.2, socket="AM5", cpu_tdp=65),
-        ComponentOption(ComponentType.CPU, "Intel Core i5-13400F", "intel", 18500, 8.2, 8.1, 7.8, 7.9, socket="LGA1700", cpu_tdp=65),
-        ComponentOption(ComponentType.CPU, "Intel Core i7-13700", "intel", 29000, 9.0, 9.3, 8.2, 8.8, socket="LGA1700", cpu_tdp=65),
-    ],
-    ComponentType.GPU: [
-        ComponentOption(ComponentType.GPU, "NVIDIA RTX 4060", "nvidia", 32000, 8.0, 7.0, 6.5, 7.0, gpu_tdp=115),
-        ComponentOption(ComponentType.GPU, "NVIDIA RTX 4070 SUPER", "nvidia", 62000, 9.3, 8.2, 6.8, 8.0, gpu_tdp=220),
-        ComponentOption(ComponentType.GPU, "AMD Radeon RX 7600", "amd", 29000, 7.8, 6.9, 6.3, 6.8, gpu_tdp=165),
-        ComponentOption(ComponentType.GPU, "AMD Radeon RX 7800 XT", "amd", 56000, 9.0, 8.0, 6.7, 7.8, gpu_tdp=263),
-    ],
-    ComponentType.MOTHERBOARD: [
-        ComponentOption(ComponentType.MOTHERBOARD, "MSI B550-A PRO", "msi", 11500, 7.0, 7.0, 7.0, 7.0, socket="AM4", ram_type="DDR4"),
-        ComponentOption(ComponentType.MOTHERBOARD, "ASUS TUF B650-PLUS WIFI", "asus", 22000, 8.5, 8.5, 8.2, 8.4, socket="AM5", ram_type="DDR5", supports_wifi=True),
-        ComponentOption(ComponentType.MOTHERBOARD, "Gigabyte B760M DS3H", "gigabyte", 15000, 7.8, 7.8, 7.5, 7.6, socket="LGA1700", ram_type="DDR4"),
-        ComponentOption(ComponentType.MOTHERBOARD, "ASRock B760 Pro RS", "asrock", 17000, 8.0, 8.1, 7.6, 7.8, socket="LGA1700", ram_type="DDR5"),
-    ],
-    ComponentType.RAM: [
-        ComponentOption(ComponentType.RAM, "32GB DDR4 3200 (2x16)", "kingston", 8000, 8.0, 8.2, 7.5, 7.8, ram_type="DDR4"),
-        ComponentOption(ComponentType.RAM, "16GB DDR4 3200 (2x8)", "kingston", 5000, 7.2, 7.2, 7.3, 7.2, ram_type="DDR4"),
-        ComponentOption(ComponentType.RAM, "32GB DDR5 6000 (2x16)", "gskill", 13000, 8.8, 9.0, 8.0, 8.4, ram_type="DDR5"),
-        ComponentOption(ComponentType.RAM, "16GB DDR5 5600 (2x8)", "crucial", 8500, 7.9, 8.0, 7.6, 7.7, ram_type="DDR5"),
-    ],
-    ComponentType.STORAGE: [
-        ComponentOption(ComponentType.STORAGE, "NVMe SSD 1TB PCIe 4.0", "wd", 7000, 8.0, 8.3, 7.8, 7.9),
-        ComponentOption(ComponentType.STORAGE, "NVMe SSD 2TB PCIe 4.0", "samsung", 13000, 8.8, 9.0, 8.0, 8.4),
-        ComponentOption(ComponentType.STORAGE, "NVMe SSD 512GB PCIe 3.0", "kingston", 4500, 6.8, 6.8, 7.0, 6.9),
-    ],
-    ComponentType.PSU: [
-        ComponentOption(ComponentType.PSU, "650W 80+ Bronze", "deepcool", 5500, 7.5, 7.5, 7.3, 7.4, psu_watts=650),
-        ComponentOption(ComponentType.PSU, "750W 80+ Gold", "corsair", 9000, 8.6, 8.6, 8.2, 8.4, psu_watts=750),
-        ComponentOption(ComponentType.PSU, "850W 80+ Gold", "bequiet", 12000, 9.0, 9.0, 8.5, 8.8, psu_watts=850),
-    ],
-    ComponentType.CASE: [
-        ComponentOption(ComponentType.CASE, "ATX Mid Tower Airflow", "zalman", 5000, 7.5, 7.5, 7.5, 7.5),
-        ComponentOption(ComponentType.CASE, "ATX Mid Tower Premium", "lianli", 9000, 8.7, 8.5, 8.2, 8.4),
-    ],
-}
+
+class CatalogLoadError(RuntimeError):
+    pass
+
+
+class ProductCatalogProvider:
+    def __init__(self, base_url: str | None = None, timeout_seconds: float = 5.0):
+        self._base_url = (base_url or os.getenv("PRODUCT_SERVICE_URL") or "http://localhost:8082").rstrip("/")
+        self._timeout_seconds = timeout_seconds
+
+    def load_catalog(self) -> dict[ComponentType, list[ComponentOption]]:
+        url = f"{self._base_url}/api/products/configurator"
+        try:
+            response = httpx.get(url, params={"inStock": "true"}, timeout=self._timeout_seconds)
+            response.raise_for_status()
+        except Exception as error:
+            raise CatalogLoadError(f"Failed to load product catalog from {url}") from error
+
+        payload = response.json()
+        if not isinstance(payload, list):
+            raise CatalogLoadError("Product catalog response must be a JSON array")
+
+        catalog: dict[ComponentType, list[ComponentOption]] = {component_type: [] for component_type in ComponentType}
+        for item in payload:
+            try:
+                component_type = ComponentType(str(item["componentType"]).strip().lower())
+            except Exception as error:
+                raise CatalogLoadError(f"Invalid componentType in product item: {item}") from error
+
+            price = int(round(float(item.get("price", 0))))
+            option = ComponentOption(
+                type=component_type,
+                model=str(item.get("name", "")).strip(),
+                brand=str(item.get("brand", "")).strip().lower(),
+                price=price,
+                score_gaming=float(item.get("scoreGaming", 0.0)),
+                score_work=float(item.get("scoreWork", 0.0)),
+                score_study=float(item.get("scoreStudy", 0.0)),
+                score_general=float(item.get("scoreGeneral", 0.0)),
+                socket=_normalize_str(item.get("socket")),
+                supported_sockets=tuple(_normalize_upper_list(item.get("supportedSockets"))),
+                ram_type=_normalize_upper(item.get("ramType")),
+                gpu_tdp=int(item.get("gpuTdp") or 0),
+                cpu_tdp=int(item.get("cpuTdp") or 0),
+                psu_watts=int(item.get("psuWatts") or 0),
+                supports_wifi=bool(item.get("supportsWifi", False)),
+                notes=tuple(_normalize_notes(item.get("notes"))),
+                product_id=_to_int(item.get("id")),
+            )
+
+            if option.model and option.price > 0:
+                catalog[component_type].append(option)
+
+        self._validate_catalog(catalog)
+        return catalog
+
+    def _validate_catalog(self, catalog: dict[ComponentType, list[ComponentOption]]) -> None:
+        missing = [component_type.value for component_type, items in catalog.items() if not items]
+        if missing:
+            raise CatalogLoadError(f"Catalog is incomplete. Missing component groups: {', '.join(missing)}")
+
+
+class InMemoryCatalogProvider:
+    def __init__(self, catalog: dict[ComponentType, list[ComponentOption]]):
+        self._catalog = catalog
+
+    def load_catalog(self) -> dict[ComponentType, list[ComponentOption]]:
+        return self._catalog
+
+
+def _normalize_str(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _normalize_upper(value: object) -> str | None:
+    normalized = _normalize_str(value)
+    if normalized is None:
+        return None
+    return normalized.upper()
+
+
+def _normalize_upper_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return []
+    normalized: list[str] = []
+    for item in value:
+        text = _normalize_upper(item)
+        if text and text not in normalized:
+            normalized.append(text)
+    return normalized
+
+
+def _normalize_notes(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return []
+    notes: list[str] = []
+    for item in value:
+        text = _normalize_str(item)
+        if text and text not in notes:
+            notes.append(text)
+    return notes
+
+
+def _to_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

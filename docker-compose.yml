@@ -110,6 +110,11 @@ services:
       context: ./ai-service
       dockerfile: Dockerfile
     container_name: diploma-ai-service
+    environment:
+      PRODUCT_SERVICE_URL: http://product-service:8082
+    depends_on:
+      product-service:
+        condition: service_started
     ports:
       - "8000:8000"
 

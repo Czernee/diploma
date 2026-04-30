@@ -1,10 +1,11 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+﻿import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 
 export function AppLayout() {
   const { user, logout } = useAuth();
   const { items } = useCart();
+  const isAdmin = user?.role?.toUpperCase() === "ADMIN";
 
   return (
     <div className="app-shell">
@@ -17,6 +18,7 @@ export function AppLayout() {
           <NavLink to="/configurator">ИИ-конфигуратор</NavLink>
           <NavLink to="/orders">Заказы</NavLink>
           <NavLink to="/cart">Корзина ({items.length})</NavLink>
+          {isAdmin && <NavLink to="/admin/products">Админ: товары</NavLink>}
         </nav>
         <div className="authbox">
           {user ? (

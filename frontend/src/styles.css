@@ -164,6 +164,17 @@ textarea {
   width: auto;
 }
 
+.password-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.password-toggle {
+  white-space: nowrap;
+}
+
 .btn {
   border: 0;
   border-radius: 10px;
@@ -291,6 +302,10 @@ textarea {
   }
 
   .cart-row {
+    grid-template-columns: 1fr;
+  }
+
+  .password-input {
     grid-template-columns: 1fr;
   }
 }

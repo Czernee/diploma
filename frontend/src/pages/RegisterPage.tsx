@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+﻿import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api/authApi";
 import { ApiError } from "../api/http";
@@ -11,6 +11,7 @@ export function RegisterPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,13 +48,18 @@ export function RegisterPage() {
         </label>
         <label>
           Пароль
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            type="password"
-          />
+          <div className="password-input">
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              type={showPassword ? "text" : "password"}
+            />
+            <button className="btn btn-secondary password-toggle" type="button" onClick={() => setShowPassword((prev) => !prev)}>
+              {showPassword ? "Скрыть" : "Показать"}
+            </button>
+          </div>
         </label>
         {error && <p className="error">{error}</p>}
         <button className="btn btn-primary" type="submit" disabled={loading}>

@@ -1,4 +1,4 @@
-import type { ProblemDetail } from "../types";
+﻿import type { ProblemDetail } from "../types";
 
 export class ApiError extends Error {
   status: number;
@@ -17,6 +17,22 @@ type RequestOptions = {
   token?: string;
   body?: unknown;
 };
+
+function formatValidationErrors(errors: unknown): string | null {
+  if (!errors || typeof errors !== "object") {
+    return null;
+  }
+
+  const pairs = Object.entries(errors as Record<string, unknown>)
+    .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+    .map(([key, value]) => `${key}: ${String(value)}`);
+
+  if (pairs.length === 0) {
+    return null;
+  }
+
+  return pairs.join("; ");
+}
 
 function formatStructuredDetail(detail: Record<string, unknown>): string {
   const message = typeof detail.message === "string" ? detail.message : null;
@@ -37,6 +53,11 @@ function formatStructuredDetail(detail: Record<string, unknown>): string {
 }
 
 function extractProblemMessage(problem: ProblemDetail | null, status: number): string {
+  const validationErrors = formatValidationErrors((problem as Record<string, unknown> | null)?.errors);
+  if (validationErrors) {
+    return validationErrors;
+  }
+
   const detail = problem?.detail;
 
   if (typeof detail === "string" && detail.trim().length > 0) {

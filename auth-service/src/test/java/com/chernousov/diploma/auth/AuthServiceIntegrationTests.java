@@ -24,12 +24,12 @@ class AuthServiceIntegrationTests {
         var register = authService.register(new RegisterRequest(
                 "alice",
                 "alice@example.com",
-                "password123"
+                "Password123!"
         ));
         assertThat(register.token()).isNotBlank();
         assertThat(register.user().username()).isEqualTo("alice");
 
-        var login = authService.login(new LoginRequest("alice", "password123"));
+        var login = authService.login(new LoginRequest("alice", "Password123!"));
         assertThat(login.token()).isNotBlank();
         assertThat(login.tokenType()).isEqualTo("Bearer");
 
@@ -41,17 +41,17 @@ class AuthServiceIntegrationTests {
 
     @Test
     void duplicateUserRegistrationFails() {
-        authService.register(new RegisterRequest("bob", "bob@example.com", "password123"));
+        authService.register(new RegisterRequest("bob", "bob@example.com", "Password123!"));
 
-        assertThatThrownBy(() -> authService.register(new RegisterRequest("bob", "other@example.com", "password123")))
+        assertThatThrownBy(() -> authService.register(new RegisterRequest("bob", "other@example.com", "Password123!")))
                 .isInstanceOf(UserAlreadyExistsException.class);
-        assertThatThrownBy(() -> authService.register(new RegisterRequest("other-bob", "bob@example.com", "password123")))
+        assertThatThrownBy(() -> authService.register(new RegisterRequest("other-bob", "bob@example.com", "Password123!")))
                 .isInstanceOf(UserAlreadyExistsException.class);
     }
 
     @Test
     void invalidCredentialsFail() {
-        authService.register(new RegisterRequest("charlie", "charlie@example.com", "password123"));
+        authService.register(new RegisterRequest("charlie", "charlie@example.com", "Password123!"));
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("charlie", "bad-password")))
                 .isInstanceOf(InvalidCredentialsException.class);
@@ -61,5 +61,27 @@ class AuthServiceIntegrationTests {
     void invalidTokenFails() {
         assertThatThrownBy(() -> authService.me("Bearer bad-token"))
                 .isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    void weakPasswordIsRejectedOnRegister() {
+        assertThatThrownBy(() -> authService.register(new RegisterRequest(
+                "weak-user",
+                "weak-user@example.com",
+                "password123"
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Password must include uppercase");
+    }
+
+    @Test
+    void usernameWithLeadingSpacesIsRejected() {
+        assertThatThrownBy(() -> authService.register(new RegisterRequest(
+                "  spaced-user",
+                "spaced-user@example.com",
+                "Password123!"
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("leading or trailing spaces");
     }
 }

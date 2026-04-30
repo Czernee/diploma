@@ -3,10 +3,9 @@ package com.chernousov.diploma.product.dto;
 import java.math.BigDecimal;
 import java.util.List;
 
-public record ProductResponse(
+public record ConfiguratorComponentResponse(
         Long id,
         String name,
-        String description,
         String brand,
         BigDecimal price,
         String currency,
@@ -23,8 +22,6 @@ public record ProductResponse(
         BigDecimal scoreStudy,
         BigDecimal scoreGeneral,
         List<String> notes,
-        boolean inStock,
-        Integer stockQuantity,
-        CategoryResponse category
+        boolean inStock
 ) {
 }

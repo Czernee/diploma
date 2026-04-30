@@ -1,4 +1,4 @@
-import type { Category, Product, ProductPage } from "../types";
+import type { Category, Product, ProductCreateRequest, ProductPage } from "../types";
 import { apiRequest } from "./http";
 
 type ProductSearchParams = {
@@ -30,4 +30,27 @@ export function fetchProduct(productId: number): Promise<Product> {
 
 export function fetchCategories(): Promise<Category[]> {
   return apiRequest<Category[]>("/api/products/categories");
+}
+
+export function createProduct(token: string, payload: ProductCreateRequest): Promise<Product> {
+  return apiRequest<Product>("/api/products", {
+    method: "POST",
+    token,
+    body: payload
+  });
+}
+
+export function updateProduct(token: string, productId: number, payload: ProductCreateRequest): Promise<Product> {
+  return apiRequest<Product>(`/api/products/${productId}`, {
+    method: "PUT",
+    token,
+    body: payload
+  });
+}
+
+export function deleteProduct(token: string, productId: number): Promise<void> {
+  return apiRequest<void>(`/api/products/${productId}`, {
+    method: "DELETE",
+    token
+  });
 }

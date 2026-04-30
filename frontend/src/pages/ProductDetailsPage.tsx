@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchProduct } from "../api/productApi";
 import { ApiError } from "../api/http";
@@ -75,10 +75,7 @@ export function ProductDetailsPage() {
         {product.inStock ? `В наличии: ${product.stockQuantity}` : "Нет в наличии"}
       </p>
       <p className="total">
-        Цена:{" "}
-        <strong>
-          {product.price} {product.currency}
-        </strong>
+        Цена: <strong>{product.price} {product.currency}</strong>
       </p>
 
       <div className="row">

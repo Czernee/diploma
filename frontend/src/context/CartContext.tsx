@@ -6,6 +6,7 @@ const CART_STORAGE_KEY = "diploma.cart.items";
 type CartContextValue = {
   items: CartItem[];
   addProduct: (product: Product) => void;
+  addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   setQuantity: (productId: number, quantity: number) => void;
   removeItem: (productId: number) => void;
   clear: () => void;
@@ -27,47 +28,66 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const sync = (nextItems: CartItem[]) => {
-    setItems(nextItems);
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextItems));
+  const updateItems = (updater: (prevItems: CartItem[]) => CartItem[]) => {
+    setItems((prevItems) => {
+      const nextItems = updater(prevItems);
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextItems));
+      return nextItems;
+    });
+  };
+
+  const upsertItem = (item: Omit<CartItem, "quantity">, quantityDelta: number) => {
+    updateItems((prevItems) => {
+      const existing = prevItems.find((entry) => entry.productId === item.productId);
+      if (existing) {
+        return prevItems.map((entry) =>
+          entry.productId === item.productId ? { ...entry, quantity: entry.quantity + quantityDelta } : entry
+        );
+      }
+      return [
+        ...prevItems,
+        {
+          ...item,
+          quantity: quantityDelta
+        }
+      ];
+    });
   };
 
   const value = useMemo<CartContextValue>(
     () => ({
       items,
       addProduct: (product) => {
-        const existing = items.find((item) => item.productId === product.id);
-        if (existing) {
-          sync(
-            items.map((item) =>
-              item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
-            )
-          );
-          return;
-        }
-        sync([
-          ...items,
+        upsertItem(
           {
             productId: product.id,
             productName: product.name,
-            quantity: 1,
             unitPrice: product.price,
             currency: product.currency
-          }
-        ]);
+          },
+          1
+        );
+      },
+      addItem: (item, quantity = 1) => {
+        if (quantity <= 0) {
+          return;
+        }
+        upsertItem(item, quantity);
       },
       setQuantity: (productId, quantity) => {
         if (quantity <= 0) {
-          sync(items.filter((item) => item.productId !== productId));
+          updateItems((prevItems) => prevItems.filter((item) => item.productId !== productId));
           return;
         }
-        sync(items.map((item) => (item.productId === productId ? { ...item, quantity } : item)));
+        updateItems((prevItems) =>
+          prevItems.map((item) => (item.productId === productId ? { ...item, quantity } : item))
+        );
       },
       removeItem: (productId) => {
-        sync(items.filter((item) => item.productId !== productId));
+        updateItems((prevItems) => prevItems.filter((item) => item.productId !== productId));
       },
       clear: () => {
-        sync([]);
+        updateItems(() => []);
       },
       totalAmount: items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0)
     }),

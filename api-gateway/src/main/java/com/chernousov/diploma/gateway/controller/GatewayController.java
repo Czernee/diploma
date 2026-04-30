@@ -6,11 +6,13 @@ import com.chernousov.diploma.gateway.service.AuthenticatedUser;
 import com.chernousov.diploma.gateway.service.GatewayProxyService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 public class GatewayController {
@@ -41,7 +43,10 @@ public class GatewayController {
 
     @RequestMapping({"/api/products", "/api/products/**"})
     public ResponseEntity<byte[]> products(HttpServletRequest request, @RequestBody(required = false) byte[] body) {
-        return proxy(request, body, services.product(), false);
+        if (HttpMethod.GET.matches(request.getMethod())) {
+            return proxy(request, body, services.product(), false);
+        }
+        return proxyProductsWrite(request, body);
     }
 
     @RequestMapping({"/api/orders", "/api/orders/**"})
@@ -98,5 +103,33 @@ public class GatewayController {
             headers.put(name, collected);
         });
         return headers;
+    }
+
+    private ResponseEntity<byte[]> proxyProductsWrite(HttpServletRequest request, byte[] body) {
+        HttpHeaders headers = extractHeaders(request);
+        AuthenticatedUser user = authValidationService.requireUser(headers);
+        if (user.role() == null || !"ADMIN".equalsIgnoreCase(user.role())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin role is required for product management");
+        }
+        if (user.id() != null) {
+            headers.set("X-User-Id", String.valueOf(user.id()));
+        }
+        if (user.username() != null) {
+            headers.set("X-User-Name", user.username());
+        }
+        if (user.email() != null) {
+            headers.set("X-User-Email", user.email());
+        }
+        if (user.role() != null) {
+            headers.set("X-User-Role", user.role());
+        }
+        return gatewayProxyService.forward(
+                services.product(),
+                request.getRequestURI(),
+                request.getQueryString(),
+                HttpMethod.valueOf(request.getMethod()),
+                headers,
+                body
+        );
     }
 }

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+﻿import { FormEvent, useState } from "react";
 import { createOrder } from "../api/orderApi";
 import { ApiError } from "../api/http";
 import { useAuth } from "../context/AuthContext";
@@ -56,9 +56,7 @@ export function CartPage() {
           <div key={item.productId} className="cart-row">
             <div>
               <strong>{item.productName}</strong>
-              <p className="muted">
-                {item.unitPrice} {item.currency}
-              </p>
+              <p className="muted">{item.unitPrice} {item.currency}</p>
             </div>
             <input
               type="number"
@@ -95,9 +93,7 @@ export function CartPage() {
       </form>
 
       {createdOrder && (
-        <p className="success">
-          Заказ №{createdOrder.id} создан, статус: {createdOrder.status}.
-        </p>
+        <p className="success">Заказ №{createdOrder.id} создан, статус: {createdOrder.status}.</p>
       )}
     </section>
   );

@@ -25,9 +25,56 @@ export type Product = {
   brand: string;
   price: number;
   currency: string;
+  componentType?: ProductComponentType;
+  socket?: string | null;
+  supportedSockets?: string[];
+  ramType?: string | null;
+  gpuTdp?: number;
+  cpuTdp?: number;
+  psuWatts?: number;
+  supportsWifi?: boolean;
+  scoreGaming?: number;
+  scoreWork?: number;
+  scoreStudy?: number;
+  scoreGeneral?: number;
+  notes?: string[];
   inStock: boolean;
   stockQuantity: number;
   category: Category;
+};
+
+export type ProductComponentType =
+  | "CPU"
+  | "GPU"
+  | "MOTHERBOARD"
+  | "RAM"
+  | "STORAGE"
+  | "PSU"
+  | "CASE"
+  | "OTHER";
+
+export type ProductCreateRequest = {
+  name: string;
+  description?: string | null;
+  brand: string;
+  price: number;
+  currency: string;
+  inStock: boolean;
+  stockQuantity: number;
+  categoryId: number;
+  componentType: ProductComponentType;
+  socket?: string | null;
+  supportedSockets?: string[];
+  ramType?: string | null;
+  gpuTdp: number;
+  cpuTdp: number;
+  psuWatts: number;
+  supportsWifi: boolean;
+  scoreGaming: number;
+  scoreWork: number;
+  scoreStudy: number;
+  scoreGeneral: number;
+  notes?: string | null;
 };
 
 export type ProductPage = {
@@ -83,9 +130,15 @@ export type ConfiguratorRequest = {
   preferred_brand: "intel" | "amd" | "nvidia" | "any";
   needs_wifi: boolean;
   target_resolution: "1080p" | "1440p" | "4k";
+  minimum_performance?: "entry" | "mid" | "high" | null;
+  cpu_brand_preference?: "intel" | "amd" | "any";
+  gpu_brand_preference?: "nvidia" | "amd" | "intel" | "any";
+  min_ram_gb?: number;
+  min_vram_gb?: number;
 };
 
 export type SelectedComponent = {
+  product_id?: number | null;
   type: string;
   model: string;
   brand: string;
@@ -94,7 +147,7 @@ export type SelectedComponent = {
   notes: string[];
 };
 
-export type ConfiguratorResponse = {
+export type ConfigurationVariant = {
   purpose: Purpose;
   budget: number;
   total_price: number;
@@ -103,6 +156,13 @@ export type ConfiguratorResponse = {
   components: SelectedComponent[];
   compatibility_checks: string[];
   explanation: string[];
+};
+
+export type ConfiguratorResponse = ConfigurationVariant & {
+  alternatives?: {
+    cheaper?: ConfigurationVariant | null;
+    pricier?: ConfigurationVariant | null;
+  } | null;
 };
 
 export type ProblemDetail = {

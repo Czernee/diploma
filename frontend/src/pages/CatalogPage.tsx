@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+﻿import { FormEvent, useCallback, useEffect, useState } from "react";
 import { fetchCategories, fetchProducts } from "../api/productApi";
 import { ApiError } from "../api/http";
 import { ProductCard } from "../components/ProductCard";
@@ -56,11 +56,7 @@ export function CatalogPage() {
     <section>
       <h1>Каталог товаров</h1>
       <form className="card filters" onSubmit={onSearch}>
-        <input
-          placeholder="Поиск по названию"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
+        <input placeholder="Поиск по названию" value={query} onChange={(event) => setQuery(event.target.value)} />
         <select value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="">Все категории</option>
           {categories.map((item) => (
@@ -70,11 +66,7 @@ export function CatalogPage() {
           ))}
         </select>
         <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={inStockOnly}
-            onChange={(event) => setInStockOnly(event.target.checked)}
-          />
+          <input type="checkbox" checked={inStockOnly} onChange={(event) => setInStockOnly(event.target.checked)} />
           Только в наличии
         </label>
         <button className="btn btn-primary" type="submit">

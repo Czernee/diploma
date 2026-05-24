@@ -77,7 +77,7 @@ export function CatalogPage() {
       {loading && <p>Загрузка каталога...</p>}
       {error && <p className="error">{error}</p>}
 
-      <div className="grid">
+      <div className="grid catalog-grid">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} onAddToCart={addProduct} />
         ))}

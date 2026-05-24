@@ -120,6 +120,10 @@ a:hover {
   margin-top: 1rem;
 }
 
+.catalog-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
 .card {
   border: 1px solid var(--stroke);
   border-radius: 14px;
@@ -307,5 +311,11 @@ textarea {
 
   .password-input {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1400px) {
+  .catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   }
 }

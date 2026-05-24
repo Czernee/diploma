@@ -159,4 +159,43 @@ class OrderServiceIntegrationTests {
         assertThat(loaded.id()).isEqualTo(created.id());
         assertThat(loaded.userId()).isEqualTo(701L);
     }
+
+    @Test
+    void userCannotCancelAfterOrderWasShipped() {
+        AuthenticatedUserHeader user = new AuthenticatedUserHeader(801L, "user", "USER");
+        AuthenticatedUserHeader admin = new AuthenticatedUserHeader(999L, "admin", "ADMIN");
+
+        var created = orderService.createOrder(user, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(10L, "GPU", 1, new BigDecimal("100.00"))),
+                null,
+                "RUB"
+        ));
+        orderService.updateStatus(admin, created.id(), OrderStatus.CONFIRMED);
+        orderService.updateStatus(admin, created.id(), OrderStatus.PROCESSING);
+        orderService.updateStatus(admin, created.id(), OrderStatus.SHIPPED);
+
+        assertThatThrownBy(() -> orderService.updateStatus(user, created.id(), OrderStatus.CANCELLED))
+                .isInstanceOf(InvalidOrderStatusTransitionException.class)
+                .hasMessageContaining("can no longer be cancelled");
+    }
+
+    @Test
+    void orderCannotBeChangedAfterDeliveredTerminalState() {
+        AuthenticatedUserHeader user = new AuthenticatedUserHeader(802L, "user", "USER");
+        AuthenticatedUserHeader admin = new AuthenticatedUserHeader(999L, "admin", "ADMIN");
+
+        var created = orderService.createOrder(user, new CreateOrderRequest(
+                List.of(new CreateOrderItemRequest(11L, "CPU", 1, new BigDecimal("100.00"))),
+                null,
+                "RUB"
+        ));
+        orderService.updateStatus(admin, created.id(), OrderStatus.CONFIRMED);
+        orderService.updateStatus(admin, created.id(), OrderStatus.PROCESSING);
+        orderService.updateStatus(admin, created.id(), OrderStatus.SHIPPED);
+        orderService.updateStatus(admin, created.id(), OrderStatus.DELIVERED);
+
+        assertThatThrownBy(() -> orderService.updateStatus(admin, created.id(), OrderStatus.CANCELLED))
+                .isInstanceOf(InvalidOrderStatusTransitionException.class)
+                .hasMessageContaining("terminal state");
+    }
 }

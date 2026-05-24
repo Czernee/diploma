@@ -28,6 +28,26 @@ docker compose up -d
 ./mvnw test
 ```
 
+## End-to-End Tests
+E2E tests run through `api-gateway` and cover registration, login, product browse, order creation, and AI configurator.
+
+1. Start Docker Desktop and run all services:
+```powershell
+docker compose up -d --build
+```
+2. Install E2E dependencies:
+```powershell
+python -m pip install -r e2e-tests/requirements.txt
+```
+3. Run E2E suite:
+```powershell
+python -m pytest e2e-tests -m e2e -q
+```
+
+Optional environment variables:
+- `E2E_BASE_URL` (default: `http://localhost:8080`)
+- `E2E_TIMEOUT_SECONDS` (default: `5`)
+
 ## Run Services Locally
 Example for one Java service:
 ```powershell

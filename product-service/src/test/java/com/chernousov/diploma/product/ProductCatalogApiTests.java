@@ -29,6 +29,21 @@ class ProductCatalogApiTests {
     }
 
     @Test
+    void searchRejectsInvalidPriceRange() {
+        assertThatThrownBy(() -> productService.search(new ProductSearchRequest(
+                null, null, new BigDecimal("20000"), new BigDecimal("10000"), null, 0, 20
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("minPrice must be less than or equal to maxPrice");
+    }
+
+    @Test
+    void searchCapsPageSizeToOneHundred() {
+        var result = productService.search(new ProductSearchRequest(null, null, null, null, null, 0, 1000));
+        assertThat(result.size()).isEqualTo(100);
+    }
+
+    @Test
     void searchFiltersByCategoryAndStock() {
         var result = productService.search(new ProductSearchRequest(
                 null, "graphics-cards", null, null, true, 0, 20
@@ -59,6 +74,7 @@ class ProductCatalogApiTests {
         assertThat(items).extracting("componentType")
                 .doesNotContain("OTHER");
         assertThat(items).allMatch(item -> item.price().intValue() > 0);
+        assertThat(items).allMatch(item -> item.inStock());
     }
 
     @Test
@@ -161,6 +177,40 @@ class ProductCatalogApiTests {
     }
 
     @Test
+    void updateProductFailsForUnknownId() {
+        Long categoryId = productService.listCategories().stream()
+                .filter(category -> "memory".equals(category.slug()))
+                .findFirst()
+                .orElseThrow()
+                .id();
+
+        assertThatThrownBy(() -> productService.updateProduct(999999L, new ProductCreateRequest(
+                "Unknown Product",
+                "desc",
+                "Brand",
+                new BigDecimal("11111.00"),
+                "RUB",
+                true,
+                8,
+                categoryId,
+                ProductComponentType.RAM,
+                null,
+                List.of(),
+                "DDR5",
+                0,
+                0,
+                0,
+                false,
+                new BigDecimal("7.00"),
+                new BigDecimal("7.20"),
+                new BigDecimal("7.40"),
+                new BigDecimal("7.10"),
+                "note"
+        )))
+                .isInstanceOf(ProductNotFoundException.class);
+    }
+
+    @Test
     void deleteProductRemovesCatalogItem() {
         Long categoryId = productService.listCategories().stream()
                 .filter(category -> "storage".equals(category.slug()))
@@ -196,5 +246,40 @@ class ProductCatalogApiTests {
 
         assertThatThrownBy(() -> productService.getById(created.id()))
                 .isInstanceOf(ProductNotFoundException.class);
+    }
+
+    @Test
+    void deleteProductFailsForUnknownId() {
+        assertThatThrownBy(() -> productService.deleteProduct(999999L))
+                .isInstanceOf(ProductNotFoundException.class);
+    }
+
+    @Test
+    void createProductFailsForUnknownCategory() {
+        assertThatThrownBy(() -> productService.createProduct(new ProductCreateRequest(
+                "Test Product",
+                "desc",
+                "Brand",
+                new BigDecimal("9999.00"),
+                "RUB",
+                true,
+                3,
+                999999L,
+                ProductComponentType.STORAGE,
+                null,
+                List.of(),
+                null,
+                0,
+                0,
+                0,
+                false,
+                new BigDecimal("6.20"),
+                new BigDecimal("6.20"),
+                new BigDecimal("6.20"),
+                new BigDecimal("6.20"),
+                "test"
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Category not found");
     }
 }

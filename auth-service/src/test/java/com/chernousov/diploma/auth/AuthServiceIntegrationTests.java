@@ -64,6 +64,19 @@ class AuthServiceIntegrationTests {
     }
 
     @Test
+    void nonBearerAuthorizationHeaderFails() {
+        assertThatThrownBy(() -> authService.me("Basic test-token"))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessageContaining("Bearer token");
+    }
+
+    @Test
+    void unknownUserCannotLogin() {
+        assertThatThrownBy(() -> authService.login(new LoginRequest("ghost-user", "Password123!")))
+                .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
     void weakPasswordIsRejectedOnRegister() {
         assertThatThrownBy(() -> authService.register(new RegisterRequest(
                 "weak-user",

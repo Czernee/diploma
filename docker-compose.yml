@@ -80,8 +80,12 @@ services:
       PRODUCT_DB_URL: jdbc:postgresql://postgres:5432/diploma
       PRODUCT_DB_USERNAME: diploma
       PRODUCT_DB_PASSWORD: diploma
+      PRODUCT_REDIS_HOST: redis
+      PRODUCT_REDIS_PORT: 6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8082:8082"

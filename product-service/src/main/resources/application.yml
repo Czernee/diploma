@@ -17,6 +17,14 @@ spring:
     table: flyway_schema_history_product
     baseline-on-migrate: true
     baseline-version: 0
+  cache:
+    type: redis
+  data:
+    redis:
+      host: ${PRODUCT_REDIS_HOST:localhost}
+      port: ${PRODUCT_REDIS_PORT:6379}
+      repositories:
+        enabled: false
 
 server:
   port: 8082

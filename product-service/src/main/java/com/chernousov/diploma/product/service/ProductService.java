@@ -15,6 +15,9 @@ import com.chernousov.diploma.product.repository.CategoryRepository;
 import com.chernousov.diploma.product.repository.ProductRepository;
 import com.chernousov.diploma.product.repository.specification.ProductSpecifications;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -33,10 +36,16 @@ import java.util.Objects;
 @Transactional(readOnly = true)
 public class ProductService {
 
+    private static final String PRODUCTS_SEARCH_CACHE = "products:search";
+    private static final String PRODUCT_BY_ID_CACHE = "products:by-id";
+    private static final String CATEGORIES_CACHE = "products:categories";
+    private static final String CONFIGURATOR_CACHE = "products:configurator";
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
 
+    @Cacheable(cacheNames = PRODUCTS_SEARCH_CACHE)
     public ProductPageResponse search(ProductSearchRequest request) {
         if (request.minPrice() != null && request.maxPrice() != null
                 && request.minPrice().compareTo(request.maxPrice()) > 0) {
@@ -62,16 +71,19 @@ public class ProductService {
         );
     }
 
+    @Cacheable(cacheNames = PRODUCT_BY_ID_CACHE, key = "#productId")
     public ProductResponse getById(Long productId) {
         return productRepository.findById(productId)
                 .map(productMapper::toResponse)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
     }
 
+    @Cacheable(cacheNames = CATEGORIES_CACHE)
     public List<CategoryResponse> listCategories() {
         return productMapper.toCategoryResponses(categoryRepository.findAll(Sort.by(Sort.Direction.ASC, "name")));
     }
 
+    @Cacheable(cacheNames = CONFIGURATOR_CACHE, key = "#inStockOnly")
     public List<ConfiguratorComponentResponse> listConfiguratorComponents(Boolean inStockOnly) {
         return productRepository.findByComponentTypeNot(ProductComponentType.OTHER)
                 .stream()
@@ -82,6 +94,12 @@ public class ProductService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = PRODUCTS_SEARCH_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = PRODUCT_BY_ID_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = CATEGORIES_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = CONFIGURATOR_CACHE, allEntries = true)
+    })
     public ProductResponse createProduct(ProductCreateRequest request) {
         Category category = findCategory(request.categoryId());
 
@@ -113,6 +131,12 @@ public class ProductService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = PRODUCTS_SEARCH_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = PRODUCT_BY_ID_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = CATEGORIES_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = CONFIGURATOR_CACHE, allEntries = true)
+    })
     public ProductResponse updateProduct(Long productId, ProductCreateRequest request) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
@@ -146,6 +170,12 @@ public class ProductService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = PRODUCTS_SEARCH_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = PRODUCT_BY_ID_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = CATEGORIES_CACHE, allEntries = true),
+            @CacheEvict(cacheNames = CONFIGURATOR_CACHE, allEntries = true)
+    })
     public void deleteProduct(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));

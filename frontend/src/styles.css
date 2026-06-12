@@ -244,6 +244,20 @@ textarea {
   flex-wrap: wrap;
 }
 
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.pagination p {
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+}
+
 .product-details {
   max-width: 760px;
 }
@@ -284,6 +298,136 @@ textarea {
   gap: 0.8rem;
 }
 
+.configurator-form {
+  max-width: 760px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assistant-card {
+  max-width: 860px;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.9rem;
+  background:
+    radial-gradient(circle at top right, rgba(249, 168, 37, 0.16), transparent 34%),
+    linear-gradient(135deg, #f8fffb, #fff8ea);
+}
+
+.assistant-card h2 {
+  margin: 0 0 0.25rem;
+}
+
+.assistant-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.assistant-form textarea {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.assistant-answer {
+  border: 1px solid #a8d8c5;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.85rem 1rem;
+  white-space: pre-line;
+}
+
+.assistant-answer p {
+  margin: 0;
+}
+
+.assistant-meta {
+  margin-top: 0.6rem !important;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.configurator-form .checkbox,
+.configurator-form .error,
+.configurator-form button {
+  grid-column: 1 / -1;
+}
+
+.configurator-result {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.configurator-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.2rem;
+}
+
+.configurator-summary p {
+  margin: 0;
+}
+
+.ml-score {
+  min-width: 118px;
+  border: 1px solid #a8d8c5;
+  border-radius: 14px;
+  padding: 0.65rem 0.8rem;
+  background: linear-gradient(145deg, #e8fff5, #fff7e9);
+  text-align: center;
+}
+
+.ml-score span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.ml-score strong {
+  display: block;
+  color: var(--primary-strong);
+  font-size: 1.45rem;
+}
+
+.ml-meter {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe9e4;
+}
+
+.ml-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+}
+
+.configuration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.8rem;
+}
+
+.component-card {
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: #fbfffd;
+  padding: 0.85rem;
+}
+
+.component-card h3 {
+  margin: 0.25rem 0;
+}
+
+.configurator-details {
+  border-top: 1px dashed var(--stroke);
+  padding-top: 0.7rem;
+}
+
+.configurator-details summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
 .error {
   color: var(--danger);
 }
@@ -309,8 +453,21 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .pagination {
+    flex-direction: column;
+  }
+
   .password-input {
     grid-template-columns: 1fr;
+  }
+
+  .configurator-form {
+    grid-template-columns: 1fr;
+  }
+
+  .order-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

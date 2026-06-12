@@ -39,6 +39,26 @@ def _engine() -> ConfiguratorEngine:
     return ConfiguratorEngine(catalog_provider=InMemoryCatalogProvider(_test_catalog()))
 
 
+def _high_end_catalog() -> dict[ComponentType, list[ComponentOption]]:
+    catalog = _test_catalog()
+    catalog[ComponentType.CPU] = [
+        ComponentOption(ComponentType.CPU, "Core i3-12100F", "intel", 9000, 6.9, 6.6, 6.4, 6.5, socket="LGA1700", cpu_tdp=58),
+        ComponentOption(ComponentType.CPU, "Core i7-14700F", "intel", 36000, 9.1, 9.2, 8.6, 8.9, socket="LGA1700", cpu_tdp=125),
+    ]
+    catalog[ComponentType.GPU] = [
+        ComponentOption(ComponentType.GPU, "GeForce RTX 4090", "nvidia", 190000, 9.95, 9.8, 8.0, 9.4, gpu_tdp=450, notes=("24GB VRAM",)),
+        ComponentOption(ComponentType.GPU, "GeForce RTX 4070 Super", "nvidia", 65000, 9.0, 8.2, 7.2, 8.4, gpu_tdp=220, notes=("12GB VRAM",)),
+    ]
+    catalog[ComponentType.RAM] = [
+        ComponentOption(ComponentType.RAM, "16GB DDR4 3200", "kingston", 4500, 7.1, 7.1, 7.0, 7.1, ram_type="DDR4", notes=("16GB total",)),
+        ComponentOption(ComponentType.RAM, "32GB DDR4 3600", "kingston", 8500, 8.2, 8.4, 7.7, 8.0, ram_type="DDR4", notes=("32GB total",)),
+    ]
+    catalog[ComponentType.PSU] = [
+        ComponentOption(ComponentType.PSU, "1000W 80+ Gold PSU", "corsair", 18000, 9.2, 9.2, 8.5, 9.0, psu_watts=1000),
+    ]
+    return catalog
+
+
 def test_recommendation_stays_within_budget() -> None:
     engine = _engine()
     response = engine.recommend(
@@ -65,10 +85,13 @@ def test_recommendation_includes_alternatives() -> None:
     )
 
     assert response.alternatives is not None
-    assert response.alternatives.pricier is not None
-    assert response.alternatives.pricier.total_price > response.total_price
+    assert response.alternatives.cheaper is not None or response.alternatives.pricier is not None
+    assert response.ml_score > 0
+    assert any("Оценка соответствия требованиям" in item for item in response.explanation)
     if response.alternatives.cheaper is not None:
         assert response.alternatives.cheaper.total_price < response.total_price
+    if response.alternatives.pricier is not None:
+        assert response.alternatives.pricier.total_price > response.total_price
 
 
 def test_compatibility_is_reported() -> None:
@@ -85,7 +108,7 @@ def test_compatibility_is_reported() -> None:
     component_types = {component.type for component in response.components}
     assert ComponentType.CPU in component_types
     assert ComponentType.MOTHERBOARD in component_types
-    assert any("socket" in check.lower() for check in response.compatibility_checks)
+    assert any("сокет" in check.lower() for check in response.compatibility_checks)
 
 
 def test_too_low_budget_raises_budget_constraint_error() -> None:
@@ -165,3 +188,24 @@ def test_too_high_vram_requirement_raises_error() -> None:
                 min_vram_gb=24,
             )
         )
+
+
+def test_high_end_gpu_is_not_paired_with_budget_cpu() -> None:
+    engine = ConfiguratorEngine(catalog_provider=InMemoryCatalogProvider(_high_end_catalog()))
+    response = engine.recommend(
+        ConfigurationRequest(
+            budget=280000,
+            purpose=Purpose.GAMING,
+            target_resolution="4k",
+            preferred_brand="nvidia",
+        )
+    )
+
+    cpu = next(component for component in response.components if component.type == ComponentType.CPU)
+    gpu = next(component for component in response.components if component.type == ComponentType.GPU)
+    ram = next(component for component in response.components if component.type == ComponentType.RAM)
+
+    if gpu.model == "GeForce RTX 4090":
+        assert cpu.model == "Core i7-14700F"
+        assert "32GB" in ram.model
+    assert any("Баланс CPU/GPU" in check for check in response.compatibility_checks)

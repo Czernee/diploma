@@ -1,5 +1,6 @@
 package com.chernousov.diploma.product.dto;
 
+import java.io.Serializable;
 import java.util.List;
 
 public record ProductPageResponse(
@@ -8,5 +9,5 @@ public record ProductPageResponse(
         int size,
         long totalItems,
         int totalPages
-) {
+) implements Serializable {
 }

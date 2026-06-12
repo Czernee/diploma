@@ -15,6 +15,65 @@ from .models import (
     Purpose,
     SelectedComponent,
 )
+from .ml import MLConfigurationRanker
+
+
+NOTE_TRANSLATIONS = {
+    "great value gaming cpu": "Хороший игровой процессор за свои деньги",
+    "entry desktop cpu": "Базовый процессор для повседневных задач",
+    "budget cpu": "Бюджетный процессор",
+    "good value in 2026": "Хорошее соотношение цены и возможностей в 2026 году",
+    "top-tier gaming and productivity cpu": "Флагманский процессор для игр и рабочих задач",
+    "strong mid-range cpu": "Уверенный процессор среднего класса",
+    "low power draw": "Низкое энергопотребление",
+    "high multicore performance": "Высокая многопоточная производительность",
+    "needs good cooling": "Требует хорошего охлаждения",
+    "great multicore performance": "Хорошая многопоточная производительность",
+    "excellent gaming cpu": "Отличный процессор для игр",
+    "strong am5 upgrade path": "Хорошая перспектива апгрейда на платформе AM5",
+    "8gb vram": "8 ГБ видеопамяти",
+    "16gb vram": "16 ГБ видеопамяти",
+    "24gb vram": "24 ГБ видеопамяти",
+    "dlss support": "Поддержка DLSS",
+    "good entry option": "Хороший вариант начального уровня",
+    "strong value in budget builds": "Хорошее решение для бюджетных сборок",
+    "efficient 1080p card": "Энергоэффективная видеокарта для 1080p",
+    "top tier gaming": "Высокий уровень для игр",
+    "excellent raster performance": "Отличная растровая производительность",
+    "great for 1440p gaming": "Хорошо подходит для игр в 1440p",
+    "high raster performance": "Высокая растровая производительность",
+    "24gb vram for extreme workloads": "24 ГБ видеопамяти для тяжелых рабочих нагрузок",
+    "entry am4 board": "Базовая материнская плата AM4",
+    "budget am4 board": "Бюджетная материнская плата AM4",
+    "wi-fi included": "Встроенный Wi-Fi",
+    "am5 platform": "Платформа AM5",
+    "good budget option": "Хороший бюджетный вариант",
+    "high-end vrm": "Усиленная подсистема питания",
+    "wi-fi 6 support": "Поддержка Wi-Fi 6",
+    "affordable intel platform board": "Доступная материнская плата для платформы Intel",
+    "good value nvme drive": "NVMe-накопитель с хорошим соотношением цены и скорости",
+    "16gb dual-channel kit": "Двухканальный комплект RAM на 16 ГБ",
+    "32gb dual-channel kit": "Двухканальный комплект RAM на 32 ГБ",
+    "64gb dual-channel kit": "Двухканальный комплект RAM на 64 ГБ",
+    "16gb total": "Общий объем 16 ГБ",
+    "32gb total": "Общий объем 32 ГБ",
+    "entry ddr5 option": "Базовый вариант DDR5",
+    "good for entry builds": "Подходит для сборок начального уровня",
+    "excellent value": "Отличное соотношение цены и возможностей",
+    "budget 512gb ssd": "Бюджетный SSD на 512 ГБ",
+    "small but fast": "Небольшой, но быстрый накопитель",
+    "good for os and apps": "Подходит для системы и приложений",
+    "enough for mid-range gpu builds": "Достаточно для сборок с видеокартой среднего класса",
+    "entry 550w unit": "Базовый блок питания на 550 Вт",
+    "good for up to mid-range gpus": "Подходит для видеокарт до среднего класса",
+    "headroom for 320w+ gpus": "Есть запас для видеокарт от 320 Вт",
+    "recommended for high-end gpus": "Рекомендуется для мощных видеокарт",
+    "compact budget case": "Компактный бюджетный корпус",
+    "affordable airflow case": "Доступный корпус с хорошей продуваемостью",
+    "good thermal performance for budget builds": "Хорошая вентиляция для бюджетных сборок",
+    "large chassis with top airflow": "Просторный корпус с хорошей продуваемостью",
+    "excellent cable management and airflow": "Хорошая организация кабелей и вентиляция",
+}
 
 
 @dataclass(frozen=True)
@@ -51,8 +110,8 @@ class ConfiguratorEngine:
     class BudgetConstraintError(ValueError):
         def __init__(self, budget: int, minimum_required_budget: int):
             super().__init__(
-                f"Budget {budget} RUB is too low for a compatible build. "
-                f"Minimum required budget is {minimum_required_budget} RUB."
+                f"Бюджета {budget} RUB недостаточно для совместимой конфигурации. "
+                f"Минимальный бюджет: {minimum_required_budget} RUB."
             )
             self.budget = budget
             self.minimum_required_budget = minimum_required_budget
@@ -63,14 +122,16 @@ class ConfiguratorEngine:
     class PerformanceConstraintError(ValueError):
         def __init__(self, minimum_requested: PerformanceEstimate, actual: PerformanceEstimate):
             super().__init__(
-                f"Unable to satisfy minimum performance tier '{minimum_requested.value}'. "
-                f"Best achievable tier for current constraints is '{actual.value}'."
+                f"Не удалось выполнить требование к производительности: "
+                f"запрошен уровень '{minimum_requested.value}', "
+                f"лучший достижимый уровень при текущих ограничениях: '{actual.value}'."
             )
             self.minimum_requested = minimum_requested
             self.actual = actual
 
     def __init__(self, catalog_provider: CatalogProvider | None = None):
         self._catalog_provider = catalog_provider or ProductCatalogProvider()
+        self._ml_ranker = MLConfigurationRanker()
 
     def recommend(self, request: ConfigurationRequest) -> ConfigurationResponse:
         catalog = self._catalog_provider.load_catalog()
@@ -89,6 +150,23 @@ class ConfiguratorEngine:
             **primary.model_dump(),
             alternatives=alternatives,
         )
+
+    def model_info(self) -> dict[str, object]:
+        metrics = self._ml_ranker.metrics
+        if metrics is None:
+            return {
+                "trained": False,
+                "message": "ML model is trained lazily after the first recommendation request.",
+            }
+        return {
+            "trained": metrics.algorithm != "expert-fallback",
+            "algorithm": metrics.algorithm,
+            "trainSamples": metrics.train_samples,
+            "testSamples": metrics.test_samples,
+            "r2": metrics.r2,
+            "mae": metrics.mae,
+            "catalogHash": metrics.catalog_hash,
+        }
 
     def _recommend_single(
         self,
@@ -177,6 +255,8 @@ class ConfiguratorEngine:
         if sum(component.price for component in selected.values()) > request.budget:
             selected = self._build_minimum_configuration(request.needs_wifi, request.purpose, catalog)
 
+        selected, ml_score = self._ml_ranker.select_best(request, catalog, selected)
+
         components = [
             self._to_selected(ComponentType.CPU, selected[ComponentType.CPU], request.purpose),
             self._to_selected(ComponentType.GPU, selected[ComponentType.GPU], request.purpose),
@@ -188,13 +268,13 @@ class ConfiguratorEngine:
         ]
 
         total_price = sum(component.price for component in components)
-        compatibility = self._compatibility_checks(selected, request.needs_wifi)
+        compatibility = self._compatibility_checks(selected, request.needs_wifi, request.purpose)
         performance = self._estimate_performance(selected, request.purpose, request.target_resolution)
         if request.minimum_performance is not None and self._performance_rank(performance) < self._performance_rank(
             request.minimum_performance
         ):
             raise self.PerformanceConstraintError(request.minimum_performance, performance)
-        explanation = self._build_explanation(request, selected, total_price, performance)
+        explanation = self._build_explanation(request, selected, total_price, performance, ml_score)
 
         return ConfigurationVariant(
             purpose=request.purpose,
@@ -202,6 +282,7 @@ class ConfiguratorEngine:
             total_price=total_price,
             components=components,
             performance_estimate=performance,
+            ml_score=ml_score,
             compatibility_checks=compatibility,
             explanation=explanation,
         )
@@ -487,6 +568,12 @@ class ConfiguratorEngine:
         if purpose == Purpose.GAMING and target_resolution == "1440p":
             score -= 0.15
 
+        balance_score = self._configuration_balance_score(selected, purpose)
+        if balance_score < 0.55:
+            score = min(score, 7.2)
+        elif balance_score < 0.75:
+            score = min(score, 8.5)
+
         if score >= 8.6:
             return PerformanceEstimate.HIGH
         if score >= 7.3:
@@ -497,6 +584,7 @@ class ConfiguratorEngine:
         self,
         selected: dict[ComponentType, ComponentOption],
         needs_wifi: bool,
+        purpose: Purpose,
     ) -> list[str]:
         checks = []
         cpu = selected[ComponentType.CPU]
@@ -506,25 +594,31 @@ class ConfiguratorEngine:
         gpu = selected[ComponentType.GPU]
 
         checks.append(
-            "CPU socket matches motherboard socket"
+            "Сокет процессора совместим с материнской платой"
             if self._is_socket_compatible(cpu, motherboard)
-            else f"CPU socket mismatch (CPU: {cpu.socket}, Motherboard: {motherboard.socket_candidates()})"
+            else f"Сокет процессора не совместим с материнской платой (CPU: {cpu.socket}, плата: {motherboard.socket_candidates()})"
         )
         checks.append(
-            "RAM type is compatible with motherboard" if ram.ram_type == motherboard.ram_type else "RAM type mismatch"
+            "Тип оперативной памяти совместим с материнской платой"
+            if ram.ram_type == motherboard.ram_type
+            else "Тип оперативной памяти не совместим с материнской платой"
         )
 
         required_watts = cpu.cpu_tdp + gpu.gpu_tdp + 150
         checks.append(
-            f"PSU headroom check passed ({psu.psu_watts}W >= {required_watts}W)"
+            f"Мощности блока питания достаточно ({psu.psu_watts} Вт >= {required_watts} Вт)"
             if psu.psu_watts >= required_watts
-            else f"PSU headroom check failed ({psu.psu_watts}W < {required_watts}W)"
+            else f"Мощности блока питания недостаточно ({psu.psu_watts} Вт < {required_watts} Вт)"
         )
 
         if needs_wifi:
             checks.append(
-                "Motherboard has onboard Wi-Fi" if motherboard.supports_wifi else "Wi-Fi not onboard (requires adapter)"
+                "На материнской плате есть встроенный Wi-Fi"
+                if motherboard.supports_wifi
+                else "На материнской плате нет встроенного Wi-Fi, потребуется отдельный адаптер"
             )
+
+        checks.extend(self._balance_checks(selected, purpose))
 
         return checks
 
@@ -534,30 +628,39 @@ class ConfiguratorEngine:
         selected: dict[ComponentType, ComponentOption],
         total_price: int,
         performance: PerformanceEstimate,
+        ml_score: float,
     ) -> list[str]:
         cpu = selected[ComponentType.CPU]
         gpu = selected[ComponentType.GPU]
         motherboard = selected[ComponentType.MOTHERBOARD]
         explanation = [
-            f"Configuration optimized for {request.purpose.value} workload within {request.budget} RUB budget.",
-            f"CPU ({cpu.model}) and GPU ({gpu.model}) chosen as the best value/performance pair.",
-            f"Motherboard ({motherboard.model}) selected for socket and memory compatibility.",
-            f"Total cost is {total_price} RUB with performance tier {performance.value}.",
+            f"Конфигурация подобрана под сценарий '{self._purpose_label(request.purpose)}' "
+            f"и бюджет {request.budget} RUB.",
+            f"Процессор {cpu.model} и видеокарта {gpu.model} выбраны как удачная пара по соотношению цены и производительности.",
+            f"Материнская плата {motherboard.model} выбрана с учетом сокета процессора и типа памяти.",
+            f"Итоговая стоимость: {total_price} RUB, уровень производительности: {self._performance_label(performance)}.",
+            f"Оценка соответствия требованиям: {round(ml_score * 100)}%.",
         ]
         if request.preferred_brand != "any":
             preferred_satisfied = any(component.brand == request.preferred_brand for component in selected.values())
             if not preferred_satisfied:
                 explanation.append(
-                    f"Preferred brand '{request.preferred_brand}' was not selected because no compatible option fit the optimization constraints."
+                    f"Предпочитаемый бренд '{request.preferred_brand}' не выбран, потому что подходящий вариант не прошел ограничения совместимости или бюджета."
                 )
         if request.minimum_performance is not None:
             explanation.append(
-                f"Minimum performance tier requirement: {request.minimum_performance.value} (achieved: {performance.value})."
+                f"Требуемый уровень производительности: {self._performance_label(request.minimum_performance)}; "
+                f"достигнутый уровень: {self._performance_label(performance)}."
             )
         if request.min_ram_gb > 0:
-            explanation.append(f"Minimum RAM requirement: {request.min_ram_gb} GB.")
+            explanation.append(f"Минимальный объем RAM: {request.min_ram_gb} ГБ.")
         if request.min_vram_gb > 0:
-            explanation.append(f"Minimum GPU VRAM requirement: {request.min_vram_gb} GB.")
+            explanation.append(f"Минимальный объем VRAM видеокарты: {request.min_vram_gb} ГБ.")
+        balance_notes = self._balance_warnings(selected, request.purpose)
+        if balance_notes:
+            explanation.extend(balance_notes)
+        else:
+            explanation.append("Баланс процессора, видеокарты и оперативной памяти проверен: явного узкого места не обнаружено.")
         return explanation
 
     def _to_selected(self, component_type: ComponentType, option: ComponentOption, purpose: Purpose) -> SelectedComponent:
@@ -568,8 +671,21 @@ class ConfiguratorEngine:
             brand=option.brand,
             price=option.price,
             score=option.score_for(purpose),
-            notes=list(option.notes),
+            notes=[self._localize_note(note) for note in option.notes],
         )
+
+    def _localize_note(self, note: str) -> str:
+        normalized = note.strip().lower()
+        if normalized in NOTE_TRANSLATIONS:
+            return NOTE_TRANSLATIONS[normalized]
+
+        # Capacity notes are useful as-is, but units should look natural in Russian UI.
+        capacity_match = re.fullmatch(r"(\d+)\s*gb\s+(vram|total)", normalized)
+        if capacity_match:
+            amount, kind = capacity_match.groups()
+            return f"{amount} ГБ {'видеопамяти' if kind == 'vram' else 'общего объема'}"
+
+        return note
 
     def _preferred_subset(self, options: list[ComponentOption], preferred_brand: str) -> list[ComponentOption]:
         if preferred_brand == "any":
@@ -626,7 +742,7 @@ class ConfiguratorEngine:
                                 best_total = total
 
         if best is None:
-            raise CatalogLoadError("Unable to build a compatible configuration from loaded product catalog")
+            raise CatalogLoadError("Не удалось собрать совместимую конфигурацию из доступного каталога товаров")
         return best
 
     def _candidate_score(self, candidate: dict[ComponentType, ComponentOption], purpose: Purpose) -> float:
@@ -657,6 +773,92 @@ class ConfiguratorEngine:
             PerformanceEstimate.HIGH: 3,
         }[tier]
 
+    def _performance_label(self, tier: PerformanceEstimate) -> str:
+        return {
+            PerformanceEstimate.ENTRY: "базовый",
+            PerformanceEstimate.MID: "средний",
+            PerformanceEstimate.HIGH: "высокий",
+        }[tier]
+
+    def _configuration_balance_score(
+        self,
+        selected: dict[ComponentType, ComponentOption],
+        purpose: Purpose,
+    ) -> float:
+        cpu_score = selected[ComponentType.CPU].score_for(purpose)
+        gpu_score = selected[ComponentType.GPU].score_for(purpose)
+        ram_gb = self._ram_capacity_gb(selected[ComponentType.RAM])
+
+        score_gap = max(gpu_score - cpu_score, 0.0)
+        gap_penalty = min(score_gap / 3.5, 1.0)
+        ram_penalty = 0.0
+        if gpu_score >= 9.5 and ram_gb < 32:
+            ram_penalty = 0.35
+        elif gpu_score >= 8.8 and ram_gb < 16:
+            ram_penalty = 0.25
+
+        return max(0.0, 1.0 - gap_penalty - ram_penalty)
+
+    def _balance_checks(self, selected: dict[ComponentType, ComponentOption], purpose: Purpose) -> list[str]:
+        cpu = selected[ComponentType.CPU]
+        gpu = selected[ComponentType.GPU]
+        ram = selected[ComponentType.RAM]
+        cpu_score = cpu.score_for(purpose)
+        gpu_score = gpu.score_for(purpose)
+        ram_gb = self._ram_capacity_gb(ram)
+
+        checks = []
+        if gpu_score >= 9.5 and cpu_score < 8.6:
+            checks.append(
+                f"Баланс CPU/GPU: видеокарта {gpu.model} требует более мощный процессор, чем {cpu.model}"
+            )
+        else:
+            checks.append("Баланс CPU/GPU: процессор соответствует уровню видеокарты")
+
+        if gpu_score >= 9.5 and ram_gb < 32:
+            checks.append("Баланс памяти: для флагманской видеокарты рекомендуется не менее 32 ГБ RAM")
+        elif gpu_score >= 8.8 and ram_gb < 16:
+            checks.append("Баланс памяти: для этой видеокарты рекомендуется не менее 16 ГБ RAM")
+        else:
+            checks.append("Баланс памяти: объем RAM соответствует уровню сборки")
+
+        return checks
+
+    def _balance_warnings(
+        self,
+        selected: dict[ComponentType, ComponentOption],
+        purpose: Purpose,
+    ) -> list[str]:
+        cpu = selected[ComponentType.CPU]
+        gpu = selected[ComponentType.GPU]
+        ram = selected[ComponentType.RAM]
+        cpu_score = cpu.score_for(purpose)
+        gpu_score = gpu.score_for(purpose)
+        ram_gb = self._ram_capacity_gb(ram)
+
+        warnings = []
+        if gpu_score >= 9.5 and cpu_score < 8.6:
+            warnings.append(
+                f"Внимание: {gpu.model} является флагманской видеокартой, поэтому процессор {cpu.model} может ограничивать ее производительность."
+            )
+        elif gpu_score - cpu_score > 2.2:
+            warnings.append(
+                f"Внимание: видеокарта заметно мощнее процессора, возможен перекос производительности в сторону GPU."
+            )
+
+        if gpu_score >= 9.5 and ram_gb < 32:
+            warnings.append("Для такой видеокарты рекомендуется 32 ГБ RAM или больше.")
+
+        return warnings
+
+    def _purpose_label(self, purpose: Purpose) -> str:
+        return {
+            Purpose.GAMING: "игры",
+            Purpose.WORK: "работа",
+            Purpose.STUDY: "учеба",
+            Purpose.GENERAL: "универсальное использование",
+        }[purpose]
+
     def _is_selection_valid(
         self,
         selected: dict[ComponentType, ComponentOption],
@@ -686,8 +888,8 @@ class ConfiguratorEngine:
     ) -> None:
         if not self._is_selection_valid(selected, needs_wifi):
             raise self.PreferenceConstraintError(
-                "Selected parameter constraints produced an incompatible configuration. "
-                "Adjust requested parameters or Wi-Fi requirement."
+                "Заданные параметры привели к несовместимой конфигурации. "
+                "Измените требования к комплектующим или параметр Wi-Fi."
             )
 
     def _apply_capacity_preferences(
@@ -703,7 +905,7 @@ class ConfiguratorEngine:
             ]
             if not ram_options:
                 raise self.PreferenceConstraintError(
-                    f"No RAM options found with capacity at least {request.min_ram_gb} GB."
+                    f"В каталоге нет вариантов оперативной памяти объемом не менее {request.min_ram_gb} ГБ."
                 )
             filtered[ComponentType.RAM] = ram_options
 
@@ -713,7 +915,7 @@ class ConfiguratorEngine:
             ]
             if not gpu_options:
                 raise self.PreferenceConstraintError(
-                    f"No GPU options found with VRAM at least {request.min_vram_gb} GB."
+                    f"В каталоге нет видеокарт с VRAM не менее {request.min_vram_gb} ГБ."
                 )
             filtered[ComponentType.GPU] = gpu_options
 

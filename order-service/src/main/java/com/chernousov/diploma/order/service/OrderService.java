@@ -8,9 +8,11 @@ import com.chernousov.diploma.order.dto.CreateOrderItemRequest;
 import com.chernousov.diploma.order.dto.CreateOrderRequest;
 import com.chernousov.diploma.order.dto.OrderItemResponse;
 import com.chernousov.diploma.order.dto.OrderResponse;
+import com.chernousov.diploma.order.dto.OrderStatusHistoryResponse;
 import com.chernousov.diploma.order.exception.InvalidOrderStatusTransitionException;
 import com.chernousov.diploma.order.exception.OrderNotFoundException;
 import com.chernousov.diploma.order.repository.CustomerOrderRepository;
+import com.chernousov.diploma.order.repository.OrderStatusHistoryRepository;
 import com.chernousov.diploma.order.service.event.OrderEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class OrderService {
     );
 
     private final CustomerOrderRepository orderRepository;
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final OrderEventPublisher orderEventPublisher;
 
     @Transactional
@@ -95,6 +98,21 @@ public class OrderService {
                     .orElseThrow(() -> new OrderNotFoundException(orderId));
         }
         return toResponse(order);
+    }
+
+    public List<OrderStatusHistoryResponse> orderStatusHistory(AuthenticatedUserHeader user, Long orderId) {
+        getOrder(user, orderId);
+        return orderStatusHistoryRepository.findByOrderIdOrderByChangedAtAsc(orderId)
+                .stream()
+                .map(history -> new OrderStatusHistoryResponse(
+                        history.getId(),
+                        history.getOrderId(),
+                        history.getPreviousStatus(),
+                        history.getNewStatus(),
+                        history.getEventType(),
+                        history.getChangedAt()
+                ))
+                .toList();
     }
 
     @Transactional

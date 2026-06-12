@@ -69,9 +69,29 @@ def test_recommend_endpoint() -> None:
     body = response.json()
     assert body["purpose"] == "gaming"
     assert body["total_price"] <= 120000
+    assert body["ml_score"] > 0
     assert len(body["components"]) == 7
     assert "alternatives" in body
-    assert body["alternatives"] is None or body["alternatives"].get("pricier") is not None
+    assert body["alternatives"] is None or body["alternatives"].get("cheaper") is not None or body["alternatives"].get("pricier") is not None
+
+
+def test_model_info_endpoint_reports_trained_model_after_recommendation() -> None:
+    payload = {
+        "budget": 120000,
+        "purpose": "gaming",
+        "preferred_brand": "any",
+        "needs_wifi": False,
+        "target_resolution": "1080p",
+    }
+    client.post("/api/configurator/recommend", json=payload)
+
+    response = client.get("/api/configurator/model")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trained"] is True
+    assert body["algorithm"] == "GradientBoostingRegressor"
+    assert body["trainSamples"] > 0
+    assert body["testSamples"] > 0
 
 
 def test_generate_alias_endpoint() -> None:

@@ -60,18 +60,18 @@ class ProductCatalogProvider:
             response = httpx.get(url, params={"inStock": "true"}, timeout=self._timeout_seconds)
             response.raise_for_status()
         except Exception as error:
-            raise CatalogLoadError(f"Failed to load product catalog from {url}") from error
+            raise CatalogLoadError(f"Не удалось загрузить каталог товаров из product-service: {url}") from error
 
         payload = response.json()
         if not isinstance(payload, list):
-            raise CatalogLoadError("Product catalog response must be a JSON array")
+            raise CatalogLoadError("Product-service вернул каталог в некорректном формате")
 
         catalog: dict[ComponentType, list[ComponentOption]] = {component_type: [] for component_type in ComponentType}
         for item in payload:
             try:
                 component_type = ComponentType(str(item["componentType"]).strip().lower())
             except Exception as error:
-                raise CatalogLoadError(f"Invalid componentType in product item: {item}") from error
+                raise CatalogLoadError(f"Некорректный тип комплектующего в товаре каталога: {item}") from error
 
             price = int(round(float(item.get("price", 0))))
             option = ComponentOption(
@@ -103,7 +103,7 @@ class ProductCatalogProvider:
     def _validate_catalog(self, catalog: dict[ComponentType, list[ComponentOption]]) -> None:
         missing = [component_type.value for component_type, items in catalog.items() if not items]
         if missing:
-            raise CatalogLoadError(f"Catalog is incomplete. Missing component groups: {', '.join(missing)}")
+            raise CatalogLoadError(f"Каталог неполный. Не хватает групп комплектующих: {', '.join(missing)}")
 
 
 class InMemoryCatalogProvider:

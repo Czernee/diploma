@@ -3,6 +3,7 @@ package com.chernousov.diploma.order.controller;
 import com.chernousov.diploma.order.dto.AuthenticatedUserHeader;
 import com.chernousov.diploma.order.dto.CreateOrderRequest;
 import com.chernousov.diploma.order.dto.OrderResponse;
+import com.chernousov.diploma.order.dto.OrderStatusHistoryResponse;
 import com.chernousov.diploma.order.dto.UpdateOrderStatusRequest;
 import com.chernousov.diploma.order.exception.InvalidUserHeaderException;
 import com.chernousov.diploma.order.service.OrderService;
@@ -47,7 +48,7 @@ public class OrderController {
         return orderService.myOrders(parseUserHeader(userIdHeader, usernameHeader, userRoleHeader));
     }
 
-    @GetMapping("/{orderId}")
+    @GetMapping("/{orderId:\\d+}")
     public OrderResponse getOrder(
             @RequestHeader(name = "X-User-Id") String userIdHeader,
             @RequestHeader(name = "X-User-Name") String usernameHeader,
@@ -57,7 +58,17 @@ public class OrderController {
         return orderService.getOrder(parseUserHeader(userIdHeader, usernameHeader, userRoleHeader), orderId);
     }
 
-    @PostMapping("/{orderId}/status")
+    @GetMapping("/{orderId:\\d+}/history")
+    public List<OrderStatusHistoryResponse> orderHistory(
+            @RequestHeader(name = "X-User-Id") String userIdHeader,
+            @RequestHeader(name = "X-User-Name") String usernameHeader,
+            @RequestHeader(name = "X-User-Role", required = false) String userRoleHeader,
+            @PathVariable(name = "orderId") Long orderId
+    ) {
+        return orderService.orderStatusHistory(parseUserHeader(userIdHeader, usernameHeader, userRoleHeader), orderId);
+    }
+
+    @PostMapping("/{orderId:\\d+}/status")
     public OrderResponse updateStatus(
             @RequestHeader(name = "X-User-Id") String userIdHeader,
             @RequestHeader(name = "X-User-Name") String usernameHeader,

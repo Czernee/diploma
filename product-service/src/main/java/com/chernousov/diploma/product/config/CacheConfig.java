@@ -1,6 +1,8 @@
 package com.chernousov.diploma.product.config;
 
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -13,7 +15,7 @@ import java.time.Duration;
 import java.util.Map;
 
 @Configuration
-public class CacheConfig {
+public class CacheConfig implements CachingConfigurer {
 
     @Bean
     public RedisCacheConfiguration redisCacheConfiguration() {
@@ -21,7 +23,7 @@ public class CacheConfig {
                 .disableCachingNullValues()
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(
-                                RedisSerializer.json()
+                                RedisSerializer.java()
                         )
                 );
     }
@@ -43,5 +45,30 @@ public class CacheConfig {
                 .withInitialCacheConfigurations(caches)
                 .transactionAware()
                 .build();
+    }
+
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException exception, org.springframework.cache.Cache cache, Object key) {
+                // A stale Redis entry must not make the product catalog unavailable.
+            }
+
+            @Override
+            public void handleCachePutError(RuntimeException exception, org.springframework.cache.Cache cache, Object key, Object value) {
+                // The database remains the source of truth when Redis is temporarily inconsistent.
+            }
+
+            @Override
+            public void handleCacheEvictError(RuntimeException exception, org.springframework.cache.Cache cache, Object key) {
+                // Ignored deliberately: the next TTL expiration or explicit write will refresh the cache.
+            }
+
+            @Override
+            public void handleCacheClearError(RuntimeException exception, org.springframework.cache.Cache cache) {
+                // Ignored deliberately to keep admin catalog operations available.
+            }
+        };
     }
 }

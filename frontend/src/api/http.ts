@@ -40,6 +40,9 @@ function formatStructuredDetail(detail: Record<string, unknown>): string {
   const provided = typeof detail.providedBudget === "number" ? detail.providedBudget : null;
 
   if (message && minimum !== null && provided !== null) {
+    if (message.toLowerCase().includes("минимальный бюджет")) {
+      return message;
+    }
     return `${message}. Минимальный бюджет: ${minimum} RUB, указанный: ${provided} RUB.`;
   }
 

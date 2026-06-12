@@ -5,6 +5,7 @@ import com.chernousov.diploma.order.domain.OrderStatus;
 import com.chernousov.diploma.order.dto.AuthenticatedUserHeader;
 import com.chernousov.diploma.order.exception.InvalidOrderStatusTransitionException;
 import com.chernousov.diploma.order.repository.CustomerOrderRepository;
+import com.chernousov.diploma.order.repository.OrderStatusHistoryRepository;
 import com.chernousov.diploma.order.service.OrderService;
 import com.chernousov.diploma.order.service.event.OrderEventPublisher;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class OrderServiceUnitTests {
 
     @Mock
     private CustomerOrderRepository orderRepository;
+
+    @Mock
+    private OrderStatusHistoryRepository orderStatusHistoryRepository;
 
     @Mock
     private OrderEventPublisher orderEventPublisher;

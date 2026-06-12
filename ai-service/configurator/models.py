@@ -58,6 +58,7 @@ class ConfigurationVariant(BaseModel):
     total_price: int
     currency: Literal["RUB"] = "RUB"
     performance_estimate: PerformanceEstimate
+    ml_score: float = Field(default=0.0, ge=0.0, le=1.0)
     components: list[SelectedComponent]
     compatibility_checks: list[str]
     explanation: list[str]
@@ -77,3 +78,22 @@ class ConfigurationAlternatives(BaseModel):
 
 class ConfigurationResponse(ConfigurationVariant):
     alternatives: ConfigurationAlternatives | None = None
+
+
+class AssistantMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
+class ConfiguratorAssistantRequest(BaseModel):
+    message: str = Field(..., min_length=3, max_length=4000)
+    history: list[AssistantMessage] = Field(default_factory=list, max_length=10)
+
+
+class ConfiguratorAssistantResponse(BaseModel):
+    mode: Literal["chat", "recommendation"]
+    answer: str
+    extracted_request: ConfigurationRequest | None = None
+    recommendation: ConfigurationResponse | None = None
+    llm_model: str | None = None
+    llm_used: bool = False

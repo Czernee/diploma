@@ -1,5 +1,6 @@
 package com.chernousov.diploma.product.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -26,5 +27,5 @@ public record ProductResponse(
         boolean inStock,
         Integer stockQuantity,
         CategoryResponse category
-) {
+) implements Serializable {
 }

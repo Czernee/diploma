@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from "../types";
+import type { CartResponse, ConfigurationHistory, Order, OrderStatus } from "../types";
 import { apiRequest } from "./http";
 
 export function createOrder(
@@ -35,4 +35,51 @@ export function updateOrderStatus(token: string, orderId: number, status: OrderS
     token,
     body: { status }
   });
+}
+
+export function fetchCart(token: string): Promise<CartResponse> {
+  return apiRequest<CartResponse>("/api/orders/cart", { token });
+}
+
+export function addCartItem(
+  token: string,
+  payload: {
+    productId: number;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    currency: string;
+  }
+): Promise<CartResponse> {
+  return apiRequest<CartResponse>("/api/orders/cart/items", {
+    method: "POST",
+    token,
+    body: payload
+  });
+}
+
+export function updateCartItemQuantity(token: string, productId: number, quantity: number): Promise<CartResponse> {
+  return apiRequest<CartResponse>(`/api/orders/cart/items/${productId}`, {
+    method: "PUT",
+    token,
+    body: { quantity }
+  });
+}
+
+export function deleteCartItem(token: string, productId: number): Promise<CartResponse> {
+  return apiRequest<CartResponse>(`/api/orders/cart/items/${productId}`, {
+    method: "DELETE",
+    token
+  });
+}
+
+export function clearServerCart(token: string): Promise<CartResponse> {
+  return apiRequest<CartResponse>("/api/orders/cart", {
+    method: "DELETE",
+    token
+  });
+}
+
+export function fetchConfigurationHistory(token: string): Promise<ConfigurationHistory[]> {
+  return apiRequest<ConfigurationHistory[]>("/api/orders/configurations", { token });
 }

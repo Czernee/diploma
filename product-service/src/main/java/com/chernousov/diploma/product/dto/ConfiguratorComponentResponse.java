@@ -1,5 +1,6 @@
 package com.chernousov.diploma.product.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -23,5 +24,5 @@ public record ConfiguratorComponentResponse(
         BigDecimal scoreGeneral,
         List<String> notes,
         boolean inStock
-) {
+) implements Serializable {
 }

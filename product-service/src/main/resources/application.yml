@@ -2,7 +2,7 @@ spring:
   application:
     name: product-service
   datasource:
-    url: ${PRODUCT_DB_URL:jdbc:postgresql://localhost:5432/diploma}
+    url: ${PRODUCT_DB_URL:jdbc:postgresql://localhost:5432/diploma_product}
     username: ${PRODUCT_DB_USERNAME:diploma}
     password: ${PRODUCT_DB_PASSWORD:diploma}
   jpa:

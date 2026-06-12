@@ -2,7 +2,7 @@ spring:
   application:
     name: order-service
   datasource:
-    url: ${ORDER_DB_URL:jdbc:postgresql://localhost:5432/diploma}
+    url: ${ORDER_DB_URL:jdbc:postgresql://localhost:5432/diploma_order}
     username: ${ORDER_DB_USERNAME:diploma}
     password: ${ORDER_DB_PASSWORD:diploma}
   jpa:
@@ -19,6 +19,11 @@ spring:
     baseline-version: 0
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${ORDER_KAFKA_CONSUMER_GROUP:order-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -28,6 +33,12 @@ spring:
             add:
               type:
                 headers: false
+  data:
+    redis:
+      host: ${ORDER_REDIS_HOST:localhost}
+      port: ${ORDER_REDIS_PORT:6379}
+      repositories:
+        enabled: false
 
 server:
   port: 8083
@@ -45,6 +56,8 @@ management:
 app:
   kafka:
     enabled: ${ORDER_KAFKA_ENABLED:true}
+    consumer-groups:
+      audit: ${ORDER_AUDIT_CONSUMER_GROUP:order-service-audit}
     topics:
       order-created: ${ORDER_CREATED_TOPIC:order.created.v1}
       order-status-changed: ${ORDER_STATUS_CHANGED_TOPIC:order.status.changed.v1}

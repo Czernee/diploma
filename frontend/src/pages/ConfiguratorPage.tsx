@@ -1,10 +1,16 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { recommendConfiguration } from "../api/configuratorApi";
+import { askConfiguratorAssistant, recommendConfiguration } from "../api/configuratorApi";
 import { ApiError } from "../api/http";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
-import type { ConfigurationVariant, ConfiguratorRequest, ConfiguratorResponse, Purpose } from "../types";
+import type {
+  ConfigurationVariant,
+  ConfiguratorAssistantResponse,
+  ConfiguratorRequest,
+  ConfiguratorResponse,
+  Purpose
+} from "../types";
 
 const defaultPayload: ConfiguratorRequest = {
   budget: 100000,
@@ -20,6 +26,7 @@ const defaultPayload: ConfiguratorRequest = {
 };
 
 const purposes: Purpose[] = ["gaming", "work", "study", "general"];
+
 const purposeLabels: Record<Purpose, string> = {
   gaming: "Игры",
   work: "Работа",
@@ -47,6 +54,10 @@ function formatComponentType(type: string): string {
   return componentTypeLabels[type.toLowerCase()] ?? type.toUpperCase();
 }
 
+function formatPercent(value: number | undefined): string {
+  return `${Math.round((value ?? 0) * 100)}%`;
+}
+
 export function ConfiguratorPage() {
   const { token } = useAuth();
   const { addItem } = useCart();
@@ -57,49 +68,71 @@ export function ConfiguratorPage() {
   const [error, setError] = useState<string | null>(null);
   const [cartMessage, setCartMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cartLoading, setCartLoading] = useState(false);
+  const [assistantMessage, setAssistantMessage] = useState(
+    "Собери игровой ПК до 120000 рублей для 1440p, минимум 32 ГБ RAM, желательно NVIDIA."
+  );
+  const [assistantAnswer, setAssistantAnswer] = useState<ConfiguratorAssistantResponse | null>(null);
+  const [assistantLoading, setAssistantLoading] = useState(false);
 
-  function addComponentToCart(component: ConfigurationVariant["components"][number], variantLabel: string) {
+  async function addComponentToCart(component: ConfigurationVariant["components"][number], variantLabel: string) {
     if (!component.product_id) {
-      setCartMessage(`Не удалось добавить «${component.model}»: у товара нет ID в каталоге.`);
+      setCartMessage(`Не удалось добавить "${component.model}": у товара нет ID в каталоге.`);
       return;
     }
-    addItem(
-      {
-        productId: component.product_id,
-        productName: component.model,
-        unitPrice: component.price,
-        currency: "RUB"
-      },
-      1
-    );
-    setCartMessage(`Добавлено в корзину (${variantLabel}): ${component.model}`);
-  }
 
-  function addAllComponentsToCartFromVariant(variant: ConfigurationVariant, variantLabel: string): number {
-    const addable = variant.components.filter((component) => component.product_id);
-    if (addable.length === 0) {
-      setCartMessage("В этой конфигурации нет компонентов, связанных с товарами каталога.");
-      return 0;
-    }
-
-    addable.forEach((component) => {
-      addItem(
+    setCartLoading(true);
+    try {
+      await addItem(
         {
-          productId: component.product_id as number,
+          productId: component.product_id,
           productName: component.model,
           unitPrice: component.price,
           currency: "RUB"
         },
         1
       );
-    });
-
-    setCartMessage(`Добавлено в корзину (${variantLabel}) компонентов: ${addable.length}`);
-    return addable.length;
+      setCartMessage(`Добавлено в корзину (${variantLabel}): ${component.model}`);
+    } catch {
+      setCartMessage(`Не удалось добавить "${component.model}" в корзину. Попробуйте еще раз.`);
+    } finally {
+      setCartLoading(false);
+    }
   }
 
-  function checkoutVariant(variant: ConfigurationVariant, variantLabel: string) {
-    const added = addAllComponentsToCartFromVariant(variant, variantLabel);
+  async function addAllComponentsToCartFromVariant(variant: ConfigurationVariant, variantLabel: string): Promise<number> {
+    const addable = variant.components.filter((component) => component.product_id);
+    if (addable.length === 0) {
+      setCartMessage("В этой конфигурации нет компонентов, связанных с товарами каталога.");
+      return 0;
+    }
+
+    setCartLoading(true);
+    try {
+      for (const component of addable) {
+        await addItem(
+          {
+            productId: component.product_id as number,
+            productName: component.model,
+            unitPrice: component.price,
+            currency: "RUB"
+          },
+          1
+        );
+      }
+
+      setCartMessage(`Добавлено в корзину (${variantLabel}) компонентов: ${addable.length}`);
+      return addable.length;
+    } catch {
+      setCartMessage("Не удалось добавить весь комплект в корзину. Попробуйте еще раз.");
+      return 0;
+    } finally {
+      setCartLoading(false);
+    }
+  }
+
+  async function checkoutVariant(variant: ConfigurationVariant, variantLabel: string) {
+    const added = await addAllComponentsToCartFromVariant(variant, variantLabel);
     if (added > 0) {
       navigate("/cart");
     }
@@ -107,33 +140,94 @@ export function ConfiguratorPage() {
 
   function renderVariant(title: string, variant: ConfigurationVariant, labelForCart: string) {
     return (
-      <section className="card">
-        <h2>{title}</h2>
-        <p>
-          Уровень производительности: <strong>{performanceLabels[variant.performance_estimate]}</strong>
-        </p>
-        <p>
-          Итого: <strong>{variant.total_price} RUB</strong>
-        </p>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <button className="btn btn-primary" type="button" onClick={() => addAllComponentsToCartFromVariant(variant, labelForCart)}>
-            Добавить этот комплект в корзину
+      <section className="card configurator-result">
+        <div className="order-head">
+          <div>
+            <h2>{title}</h2>
+            <p className="muted">
+              Подбор выполнен гибридным модулем: правила совместимости + ML-ранжирование.
+            </p>
+          </div>
+          <div className="ml-score">
+            <span>Оценка соответствия</span>
+            <strong>{formatPercent(variant.ml_score)}</strong>
+          </div>
+        </div>
+
+        <div className="configurator-summary">
+          <p>
+            Производительность: <strong>{performanceLabels[variant.performance_estimate]}</strong>
+          </p>
+          <p>
+            Итоговая стоимость: <strong>{variant.total_price} RUB</strong>
+          </p>
+          <p>
+            Бюджет: <strong>{variant.budget} RUB</strong>
+          </p>
+        </div>
+
+        <div className="ml-meter" aria-label={`Оценка соответствия ${formatPercent(variant.ml_score)}`}>
+          <span style={{ width: formatPercent(variant.ml_score) }} />
+        </div>
+
+        <div className="row">
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={cartLoading}
+            onClick={() => void addAllComponentsToCartFromVariant(variant, labelForCart)}
+          >
+            {cartLoading ? "Добавляем комплект..." : "Добавить комплект в корзину"}
           </button>
-          <button className="btn btn-secondary" type="button" onClick={() => checkoutVariant(variant, labelForCart)}>
-            Оформить этот комплект
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={cartLoading}
+            onClick={() => void checkoutVariant(variant, labelForCart)}
+          >
+            {cartLoading ? "Добавляем комплект..." : "Оформить этот комплект"}
           </button>
         </div>
 
-        <ul>
+        <div className="configuration-grid">
           {variant.components.map((component) => (
-            <li key={`${title}-${component.type}-${component.model}`}>
-              {formatComponentType(component.type)}: {component.model} ({component.brand}) - {component.price} RUB{" "}
-              <button className="btn btn-secondary" type="button" onClick={() => addComponentToCart(component, labelForCart)}>
+            <article className="component-card" key={`${title}-${component.type}-${component.model}`}>
+              <p className="product-category">{formatComponentType(component.type)}</p>
+              <h3>{component.model}</h3>
+              <p className="muted">{component.brand}</p>
+              <p>
+                <strong>{component.price} RUB</strong>
+              </p>
+              <p className="muted">Оценка компонента: {component.score.toFixed(2)}</p>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                disabled={cartLoading}
+                onClick={() => void addComponentToCart(component, labelForCart)}
+              >
                 В корзину
               </button>
-            </li>
+            </article>
           ))}
-        </ul>
+        </div>
+
+        <details className="configurator-details">
+          <summary>Почему выбрана эта конфигурация</summary>
+          <ul>
+            {variant.explanation.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </details>
+
+        <details className="configurator-details">
+          <summary>Проверки совместимости</summary>
+          <ul>
+            {variant.compatibility_checks.map((check) => (
+              <li key={check}>{check}</li>
+            ))}
+          </ul>
+        </details>
       </section>
     );
   }
@@ -164,11 +258,80 @@ export function ConfiguratorPage() {
     }
   }
 
+  async function onAssistantSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!token) {
+      setError("Войдите в аккаунт, чтобы пользоваться ИИ-чатом конфигуратора.");
+      return;
+    }
+
+    setError(null);
+    setCartMessage(null);
+    setAssistantAnswer(null);
+    setAssistantLoading(true);
+
+    try {
+      const response = await askConfiguratorAssistant(token, { message: assistantMessage });
+      setAssistantAnswer(response);
+      if (response.extracted_request) {
+        setPayload(response.extracted_request);
+      }
+      if (response.recommendation) {
+        setResult(response.recommendation);
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Не удалось получить ответ ИИ-помощника.");
+      }
+    } finally {
+      setAssistantLoading(false);
+    }
+  }
+
   return (
     <section className="stack">
       <section>
         <h1>ИИ-конфигуратор ПК</h1>
-        <form className="card form" onSubmit={onSubmit}>
+        <p className="muted">
+          Опишите задачу обычным языком или заполните форму вручную. LLM понимает запрос пользователя, а подбор реальных товаров выполняет модуль правил совместимости и ML-ранжирования.
+        </p>
+
+        <section className="card assistant-card">
+          <div>
+            <h2>Чат с LLM-помощником</h2>
+            <p className="muted">
+              Можно спросить совет или попросить собрать ПК: например, для игр, работы, учебы, 1440p, с нужным объемом RAM и VRAM.
+            </p>
+          </div>
+
+          <form className="assistant-form" onSubmit={onAssistantSubmit}>
+            <label>
+              Запрос обычным языком
+              <textarea
+                value={assistantMessage}
+                onChange={(e) => setAssistantMessage(e.target.value)}
+                placeholder="Например: собери игровой ПК до 120000 рублей"
+              />
+            </label>
+            <button className="btn btn-primary" type="submit" disabled={assistantLoading || !assistantMessage.trim()}>
+              {assistantLoading ? "LLM анализирует запрос..." : "Спросить ИИ"}
+            </button>
+          </form>
+
+          {assistantAnswer && (
+            <div className="assistant-answer">
+              <p>{assistantAnswer.answer}</p>
+              <p className="assistant-meta">
+                Режим: {assistantAnswer.mode === "recommendation" ? "подбор конфигурации" : "ответ на вопрос"}
+                {assistantAnswer.llm_model ? ` · модель: ${assistantAnswer.llm_model}` : ""}
+              </p>
+            </div>
+          )}
+        </section>
+
+        <form className="card form configurator-form" onSubmit={onSubmit}>
           <label>
             Бюджет (RUB)
             <input
@@ -251,7 +414,7 @@ export function ConfiguratorPage() {
           </label>
 
           <label>
-            Предпочтение бренда CPU
+            Предпочтение CPU
             <select
               value={payload.cpu_brand_preference ?? "any"}
               onChange={(e) =>
@@ -268,7 +431,7 @@ export function ConfiguratorPage() {
           </label>
 
           <label>
-            Предпочтение бренда GPU
+            Предпочтение GPU
             <select
               value={payload.gpu_brand_preference ?? "any"}
               onChange={(e) =>
@@ -301,7 +464,7 @@ export function ConfiguratorPage() {
         </form>
       </section>
 
-      {cartMessage && <p>{cartMessage}</p>}
+      {cartMessage && <p className="success">{cartMessage}</p>}
 
       {result && (
         <>

@@ -122,6 +122,24 @@ export type CartItem = {
   currency: string;
 };
 
+export type CartResponse = {
+  items: CartItem[];
+  totalAmount: number;
+  currency: string;
+};
+
+export type ConfigurationHistory = {
+  id: number;
+  userId: number;
+  username: string;
+  purpose: string;
+  budget: number;
+  totalPrice: number;
+  currency: string;
+  performanceEstimate: string;
+  createdAt: string;
+};
+
 export type Purpose = "gaming" | "work" | "study" | "general";
 
 export type ConfiguratorRequest = {
@@ -153,6 +171,7 @@ export type ConfigurationVariant = {
   total_price: number;
   currency: "RUB";
   performance_estimate: "entry" | "mid" | "high";
+  ml_score: number;
   components: SelectedComponent[];
   compatibility_checks: string[];
   explanation: string[];
@@ -163,6 +182,23 @@ export type ConfiguratorResponse = ConfigurationVariant & {
     cheaper?: ConfigurationVariant | null;
     pricier?: ConfigurationVariant | null;
   } | null;
+};
+
+export type ConfiguratorAssistantRequest = {
+  message: string;
+  history?: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
+};
+
+export type ConfiguratorAssistantResponse = {
+  mode: "chat" | "recommendation";
+  answer: string;
+  extracted_request?: ConfiguratorRequest | null;
+  recommendation?: ConfiguratorResponse | null;
+  llm_model?: string | null;
+  llm_used: boolean;
 };
 
 export type ProblemDetail = {

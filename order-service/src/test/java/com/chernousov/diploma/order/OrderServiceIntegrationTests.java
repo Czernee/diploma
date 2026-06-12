@@ -6,10 +6,12 @@ import com.chernousov.diploma.order.dto.CreateOrderItemRequest;
 import com.chernousov.diploma.order.dto.CreateOrderRequest;
 import com.chernousov.diploma.order.exception.InvalidOrderStatusTransitionException;
 import com.chernousov.diploma.order.exception.OrderNotFoundException;
+import com.chernousov.diploma.order.service.ConfigurationHistoryService;
 import com.chernousov.diploma.order.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,6 +24,11 @@ class OrderServiceIntegrationTests {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private ConfigurationHistoryService configurationHistoryService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void createAndFetchOwnOrderWorks() {
@@ -197,5 +204,50 @@ class OrderServiceIntegrationTests {
         assertThatThrownBy(() -> orderService.updateStatus(admin, created.id(), OrderStatus.CANCELLED))
                 .isInstanceOf(InvalidOrderStatusTransitionException.class)
                 .hasMessageContaining("terminal state");
+    }
+
+    @Test
+    void configurationHistoryIsSavedForCurrentUser() throws Exception {
+        AuthenticatedUserHeader user = new AuthenticatedUserHeader(901L, "alice", "USER");
+        var payload = objectMapper.readTree("""
+                {
+                  "purpose": "gaming",
+                  "budget": 120000,
+                  "total_price": 98000,
+                  "currency": "RUB",
+                  "performance_estimate": "mid",
+                  "components": [
+                    {
+                      "product_id": 10,
+                      "type": "cpu",
+                      "model": "Ryzen 5 5600",
+                      "brand": "amd",
+                      "price": 9000,
+                      "score": 7.8
+                    }
+                  ],
+                  "compatibility_checks": [
+                    "CPU socket matches motherboard socket"
+                  ],
+                  "alternatives": {
+                    "pricier": {
+                      "purpose": "gaming",
+                      "budget": 130000,
+                      "total_price": 115000,
+                      "currency": "RUB",
+                      "performance_estimate": "high",
+                      "components": []
+                    }
+                  }
+                }
+                """);
+
+        var saved = configurationHistoryService.save(user, payload);
+        var history = configurationHistoryService.list(user);
+
+        assertThat(saved.id()).isNotNull();
+        assertThat(saved.userId()).isEqualTo(901L);
+        assertThat(saved.totalPrice()).isEqualByComparingTo("98000");
+        assertThat(history).extracting("id").contains(saved.id());
     }
 }

@@ -9,6 +9,10 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  data:
+    redis:
+      repositories:
+        enabled: false
 
 app:
   kafka:

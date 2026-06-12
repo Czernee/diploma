@@ -38,3 +38,10 @@ build/
 frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
+
+### Python ###
+__pycache__/
+*.pyc
+
+### AI artifacts ###
+ai-service/ml_artifacts/*.joblib

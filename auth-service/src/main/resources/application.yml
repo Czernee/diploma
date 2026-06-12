@@ -2,7 +2,7 @@ spring:
   application:
     name: auth-service
   datasource:
-    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/diploma}
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/diploma_auth}
     username: ${AUTH_DB_USERNAME:diploma}
     password: ${AUTH_DB_PASSWORD:diploma}
   jpa:
